@@ -3,12 +3,27 @@
 document.addEventListener('keydown',function(e){var k=(e.key||'').toLowerCase();
 if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c'))||((e.ctrlKey||e.metaKey)&&k==='u')){e.preventDefault();e.stopPropagation();return false}},true)})();
 (() => {
+  /* Statinis režimas (GitHub Pages): GitHub nemoka vykdyti Node.js,
+     todėl vietoj /api serverio naudojama naršyklės localStorage.
+     Savo serveryje (VPS) automatiškai naudojamas /api backend. */
+  const STATIC_MODE = (() => {
+    try { return /\.github\.io$/i.test(location.hostname); }
+    catch(e){ return true; }
+  })();
+
+  const DEFAULT_ADMIN_PASSWORD = 'admin123';
+
   const KEYS = {
     cart: 'luxora_cart_v1',
     favorites: 'luxora_favorites_v6',
     chats: 'luxora_chat_sessions_v6',
     buyerId: 'luxora_buyer_id_v6',
-    dropFallback: 'luxora_next_drop'
+    dropFallback: 'luxora_next_drop',
+    products: 'luxora_products_v6',
+    orders: 'luxora_orders_v6',
+    version: 'luxora_version_v6',
+    adminPw: 'luxora_admin_pw_v6',
+    adminSession: 'luxora_admin_session_v6'
   };
 
   const DELIVERY = {
@@ -54,21 +69,56 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
   }
   function sizesToText(sizes){ return Object.entries(sizes || {}).map(([s,q])=>`${s}:${q}`).join(', '); }
 
-  /* ---------- catalog (serveris, live) ---------- */
+  /* ---------- lokali saugykla (statiniam režimui) ---------- */
+  function lsGet(key, fallback){
+    try {
+      const v = localStorage.getItem(key);
+      return v == null ? clone(fallback) : JSON.parse(v);
+    } catch(e){ return clone(fallback); }
+  }
+  function lsSet(key, value){
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch(e){
+      throw new Error('Naršyklės atmintis pilna — sumažink nuotraukų skaičių ar dydį.');
+    }
+  }
+  function bumpVersion(){
+    try { localStorage.setItem(KEYS.version, String(Date.now())); } catch(e){}
+    catalogVersion = Number(localStorage.getItem(KEYS.version)) || catalogVersion;
+  }
+
+  /* ---------- katalogas (serveris, live / localStorage) ---------- */
   let productsCache = [];
   let catalogVersion = 0;
   const catalogListeners = new Set();
   function notifyCatalog(){ catalogListeners.forEach(fn => { try { fn(productsCache); } catch(e){} }); }
   function onCatalog(fn){ catalogListeners.add(fn); }
+  function loadLocalCatalog(){
+    productsCache = lsGet(KEYS.products, []);
+    if(!Array.isArray(productsCache)) productsCache = [];
+    catalogVersion = Number(lsGet(KEYS.version, 0)) || 0;
+  }
   async function refreshProducts(silent){
-    const r = await fetch('/api/products', { headers: { 'Accept': 'application/json' } });
-    if(!r.ok) throw new Error('catalog failed');
-    const data = await r.json();
-    const changed = data.version !== catalogVersion;
-    productsCache = Array.isArray(data.products) ? data.products : [];
-    catalogVersion = data.version || catalogVersion;
-    if(changed || !silent) notifyCatalog();
-    return changed;
+    if(!STATIC_MODE){
+      try {
+        const r = await fetch('/api/products', { headers: { 'Accept': 'application/json' } });
+        if(r.ok){
+          const data = await r.json();
+          if(Array.isArray(data.products)){
+            const changed = data.version !== catalogVersion;
+            productsCache = data.products;
+            catalogVersion = data.version || catalogVersion;
+            if(changed || !silent) notifyCatalog();
+            return changed;
+          }
+        }
+      } catch(e){ /* krentam į lokalų režimą */ }
+    }
+    const before = catalogVersion;
+    loadLocalCatalog();
+    if(before !== catalogVersion || !silent) notifyCatalog();
+    return before !== catalogVersion;
   }
   function getProducts(){ return productsCache; }
   function findProduct(id){ return productsCache.find(p => Number(p.id) === Number(id)) || null; }
@@ -78,13 +128,30 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
     if(pollTimer) return;
     pollTimer = setInterval(async () => {
       try {
-        const r = await fetch('/api/version');
-        const d = await r.json();
-        if(d.version && d.version !== catalogVersion){ refreshProducts().catch(()=>{}); getReputation().catch(()=>{}); }
+        if(STATIC_MODE){
+          const v = Number(localStorage.getItem(KEYS.version)) || 0;
+          if(v && v !== catalogVersion){ await refreshProducts(); getReputation().catch(()=>{}); }
+        } else {
+          const r = await fetch('/api/version');
+          const d = await r.json();
+          if(d.version && d.version !== catalogVersion){ refreshProducts().catch(()=>{}); getReputation().catch(()=>{}); }
+        }
       } catch(e){}
     }, 8000);
   }
   function connectLive(){
+    if(STATIC_MODE){
+      // Katalogo sinchronizacija tarp to paties naršyklės tabų.
+      try {
+        window.addEventListener('storage', (e) => {
+          if(e.key === KEYS.products || e.key === KEYS.version){
+            refreshProducts(true).catch(()=>{});
+          }
+        });
+      } catch(e){}
+      startPolling();
+      return;
+    }
     try {
       const es = new EventSource('/api/events');
       es.addEventListener('products', () => refreshProducts().catch(()=>{}));
@@ -96,7 +163,7 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
     setTimeout(() => { if(!sseOn) startPolling(); }, 6000);
   }
 
-  /* ---------- drop date (serveris) ---------- */
+  /* ---------- drop date (serveris / localStorage) ---------- */
   let dropCache = null;
   function defaultDropDate(){
     const now = new Date(); const target = new Date(now);
@@ -107,10 +174,12 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
   }
   async function getDropDate(){
     if(dropCache) return dropCache;
-    try {
-      const r = await fetch('/api/drop'); const d = await r.json();
-      if(d.iso){ dropCache = new Date(d.iso); return dropCache; }
-    } catch(e){}
+    if(!STATIC_MODE){
+      try {
+        const r = await fetch('/api/drop'); const d = await r.json();
+        if(d.iso){ dropCache = new Date(d.iso); return dropCache; }
+      } catch(e){}
+    }
     try {
       const saved = localStorage.getItem(KEYS.dropFallback);
       const parsed = saved ? new Date(saved) : null;
@@ -122,6 +191,7 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
   /* ---------- reputacija (Discord, per serverį) ---------- */
   let repCache = null;
   async function getReputation(){
+    if(STATIC_MODE) return repCache;
     try {
       const r = await fetch('/api/reputation');
       if(r.ok){ repCache = await r.json(); document.dispatchEvent(new CustomEvent('luxora:rep')); }
@@ -153,12 +223,55 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
     return cartDetailed().reduce((n, i) => n + (Number(i.product.price) || 0) * (Number(i.qty) || 0), 0);
   }
 
-  /* ---------- užsakymas ---------- */
+  /* ---------- užsakymas (serveris / localStorage) ---------- */
+  function localCreateOrder(payload){
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    if(!items.length) throw new Error('Krepšelis tuščias');
+    const products = lsGet(KEYS.products, []);
+    let sub = 0;
+    const lines = items.map(i => {
+      const p = products.find(x => Number(x.id) === Number(i.id));
+      if(!p) throw new Error('Prekė neberasta — atnaujink puslapį');
+      const stock = Number(p.sizes?.[i.size] ?? NaN);
+      if(!Number.isFinite(stock)) throw new Error(`Dydis "${i.size}" nebegalimas: ${p.name}`);
+      const qty = Math.max(1, Math.min(99, Number(i.qty) || 1));
+      if(stock < qty) throw new Error(`Liko tik ${stock} vnt.: ${p.name} (${i.size})`);
+      p.sizes[i.size] = stock - qty;
+      sub += (Number(p.price) || 0) * qty;
+      return { id: p.id, name: p.name, size: String(i.size), qty, price: Number(p.price) || 0 };
+    });
+    const fee = (DELIVERY[payload.delivery] || DELIVERY.lpexpress).fee;
+    const total = Math.round((sub + fee) * 100) / 100;
+    const code = 'LX-' + Date.now().toString(36).toUpperCase().slice(-6) + Math.random().toString(36).slice(2,6).toUpperCase();
+    const orders = lsGet(KEYS.orders, []);
+    const order = {
+      id: Date.now(), code, status: 'new', total, items: lines,
+      name: payload.name || '', phone: payload.phone || '', email: payload.email || '',
+      city: payload.city || '', address: payload.address || '',
+      delivery: payload.delivery || 'lpexpress', payment: payload.payment || 'bank',
+      created_at: Date.now()
+    };
+    orders.unshift(order);
+    lsSet(KEYS.products, products);
+    lsSet(KEYS.orders, orders);
+    bumpVersion();
+    productsCache = products;
+    notifyCatalog();
+    try { document.dispatchEvent(new CustomEvent('luxora:orders')); } catch(e){}
+    return { code, total, id: order.id };
+  }
   async function createOrder(payload){
-    const r = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    const data = await r.json().catch(() => ({}));
-    if(!r.ok) throw new Error(data.error || 'užsakymas nepavyko');
-    return data;
+    if(!STATIC_MODE){
+      try {
+        const r = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const data = await r.json().catch(() => ({}));
+        if(r.ok) return data;
+        if(r.status < 500) throw new Error(data.error || 'užsakymas nepavyko');
+      } catch(e){
+        if(e.message && !/Failed to fetch|NetworkError|Load failed/i.test(e.message)) throw e;
+      }
+    }
+    return localCreateOrder(payload);
   }
 
   /* ---------- pokalbiai (lokalūs, kaip anksčiau) ---------- */
@@ -166,34 +279,150 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
   function chats(){ const v = readJSON(KEYS.chats, []); return Array.isArray(v) ? v : []; }
   function saveChats(v){ try { localStorage.setItem(KEYS.chats, JSON.stringify(v)); } catch(e){} }
 
-  /* ---------- admin API ---------- */
+  /* ---------- admin (serveris / localStorage) ---------- */
+  function localAdminPw(){ try { return localStorage.getItem(KEYS.adminPw) || DEFAULT_ADMIN_PASSWORD; } catch(e){ return DEFAULT_ADMIN_PASSWORD; } }
+  function localSessionOn(){ try { return sessionStorage.getItem(KEYS.adminSession) === '1'; } catch(e){ return false; } }
+  function localSessionSet(on){ try { if(on) sessionStorage.setItem(KEYS.adminSession, '1'); else sessionStorage.removeItem(KEYS.adminSession); } catch(e){} }
   async function adminLogin(password){
-    const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
-    const d = await r.json().catch(() => ({}));
-    if(!r.ok) throw new Error(d.error || 'prisijungti nepavyko');
-    return true;
+    if(!STATIC_MODE){
+      try {
+        const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+        const d = await r.json().catch(() => ({}));
+        if(r.ok) return true;
+        if(r.status < 500) throw new Error(d.error || 'prisijungti nepavyko');
+      } catch(e){
+        if(e.message && !/Failed to fetch|NetworkError|Load failed/i.test(e.message)) throw e;
+      }
+    }
+    if(String(password) === String(localAdminPw())){ localSessionSet(true); return true; }
+    throw new Error('Neteisingas slaptažodis.');
   }
   async function adminMe(){
-    const r = await fetch('/api/admin/me');
-    return r.ok;
+    if(!STATIC_MODE){
+      try {
+        const r = await fetch('/api/admin/me');
+        if(r.ok) return true;
+      } catch(e){}
+    }
+    return localSessionOn();
   }
-  async function adminLogout(){ try { await fetch('/api/admin/logout', { method: 'POST' }); } catch(e){} }
+  async function adminLogout(){ try { await fetch('/api/admin/logout', { method: 'POST' }); } catch(e){} localSessionSet(false); }
+  function localApiAdmin(path, opts = {}){
+    const method = (opts.method || 'GET').toUpperCase();
+    const body = opts.body ? JSON.parse(opts.body) : null;
+    const products = lsGet(KEYS.products, []);
+    const orders = lsGet(KEYS.orders, []);
+    const prodIdMatch = path.match(/^\/api\/admin\/products\/(\d+)$/);
+    const orderIdMatch = path.match(/^\/api\/admin\/orders\/(\d+)$/);
+    if(path === '/api/admin/orders' && method === 'GET') return { orders };
+    if(path === '/api/admin/products' && method === 'POST'){
+      const maxId = products.reduce((m, p) => Math.max(m, Number(p.id) || 0), 0);
+      const p = { ...body, id: maxId + 1 };
+      products.unshift(p);
+      lsSet(KEYS.products, products);
+      bumpVersion(); productsCache = products; notifyCatalog();
+      return { product: p };
+    }
+    if(prodIdMatch && (method === 'PUT' || method === 'DELETE')){
+      const id = Number(prodIdMatch[1]);
+      const idx = products.findIndex(x => Number(x.id) === id);
+      if(idx < 0) throw new Error('Prekė nerasta');
+      if(method === 'DELETE'){ products.splice(idx, 1); }
+      else { products[idx] = { ...products[idx], ...body, id }; }
+      lsSet(KEYS.products, products);
+      bumpVersion(); productsCache = products; notifyCatalog();
+      return { ok: true };
+    }
+    if(orderIdMatch && method === 'PATCH'){
+      const id = Number(orderIdMatch[1]);
+      const o = orders.find(x => Number(x.id) === id);
+      if(!o) throw new Error('Užsakymas nerastas');
+      o.status = body.status;
+      lsSet(KEYS.orders, orders);
+      try { document.dispatchEvent(new CustomEvent('luxora:orders')); } catch(e){}
+      return { ok: true };
+    }
+    if(path === '/api/admin/drop' && method === 'PUT'){
+      dropCache = null;
+      try { localStorage.setItem(KEYS.dropFallback, String(body.iso)); } catch(e){}
+      try { document.dispatchEvent(new CustomEvent('luxora:drop')); } catch(e){}
+      return { ok: true };
+    }
+    if(path === '/api/admin/password' && method === 'PUT'){
+      if(String(body.current) !== String(localAdminPw())) throw new Error('Dabartinis slaptažodis neteisingas.');
+      if(!body.next || String(body.next).length < 4) throw new Error('Naujas slaptažodis per trumpas (min 4).');
+      try { localStorage.setItem(KEYS.adminPw, String(body.next)); } catch(e){}
+      return { ok: true };
+    }
+    throw new Error('serverio klaida');
+  }
   async function apiAdmin(path, opts = {}){
-    const r = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
-    const d = await r.json().catch(() => ({}));
-    if(r.status === 401) throw new Error('unauthorized');
-    if(!r.ok) throw new Error(d.error || 'serverio klaida');
-    return d;
+    if(!STATIC_MODE){
+      try {
+        const r = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+        const ct = (r.headers.get('content-type') || '').toLowerCase();
+        if(r.ok && ct.includes('application/json')){
+          const d = await r.json().catch(() => ({}));
+          return d;
+        }
+        if(r.status === 401) throw new Error('unauthorized');
+        if(r.status < 500){
+          const d = ct.includes('application/json') ? await r.json().catch(() => ({})) : {};
+          throw new Error(d.error || 'serverio klaida');
+        }
+      } catch(e){
+        if(e.message === 'unauthorized' || /^(Dabartinis|Naujas|Prekė|Užsakymas)/.test(e.message || '')) throw e;
+      }
+    } else {
+      try {
+        if(!(await localSessionOn())) throw new Error('unauthorized');
+      } catch(e){ throw new Error('unauthorized'); }
+    }
+    if(!STATIC_MODE){
+      try { if(!(await adminMe())) throw new Error('unauthorized'); } catch(e){ throw new Error('unauthorized'); }
+    }
+    return localApiAdmin(path, opts);
+  }
+  function fileToDataURL(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Nepavyko perskaityti failo'));
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    });
   }
   async function uploadImages(files){
-    const fd = new FormData();
-    [...files].slice(0, 5).forEach(f => fd.append('images', f));
-    const r = await fetch('/api/admin/upload', { method: 'POST', body: fd });
-    const d = await r.json().catch(() => ({}));
-    if(r.status === 401) throw new Error('unauthorized');
-    if(!r.ok) throw new Error(d.error || 'nepavyko įkelti');
-    return d.urls || [];
+    const list = [...files].slice(0, 5);
+    if(!STATIC_MODE){
+      try {
+        const fd = new FormData();
+        list.forEach(f => fd.append('images', f));
+        const r = await fetch('/api/admin/upload', { method: 'POST', body: fd });
+        const ct = (r.headers.get('content-type') || '').toLowerCase();
+        if(r.ok && ct.includes('application/json')){
+          const d = await r.json().catch(() => ({}));
+          if(Array.isArray(d.urls) && d.urls.length) return d.urls;
+        }
+        if(r.status === 401) throw new Error('unauthorized');
+      } catch(e){
+        if(e.message === 'unauthorized') throw e;
+      }
+    }
+    // Statiniam režimui nuotraukos saugomos kaip dataURL tiesiai prekėje.
+    const urls = [];
+    for(const f of list){ urls.push(await fileToDataURL(f)); }
+    return urls;
   }
+
+  // Katalogo sinchronizacija tarp tabų (abiem režimais).
+  try {
+    window.addEventListener('storage', (e) => {
+      if(e.key === KEYS.products || e.key === KEYS.version){
+        const v = Number(localStorage.getItem(KEYS.version)) || 0;
+        if(v !== catalogVersion){ refreshProducts(true).catch(()=>{}); }
+      }
+    });
+  } catch(e){}
 
   window.LuxoraStore = {
     KEYS, DELIVERY, BANK, silhouettes,
