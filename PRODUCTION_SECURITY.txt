@@ -1,0 +1,33 @@
+LUXORA — REZERVACIJŲ APSAUGA PRODUKCIJAI
+
+Dabartinėje V6 front-end versijoje jau yra:
+- 3 s cooldown tarp naujų rezervacijų vienoje naršyklėje;
+- iki 5 aktyvių rezervacijų vienoje naršyklėje;
+- apsauga nuo pakartotinio to paties mygtuko greito paspaudimo.
+
+Tai pagerina UX, bet NĖRA tikra serverio apsauga.
+Kai rezervacijos bus perkeltos į Node.js / kitą backend, serveris turi pats atmesti per dažnas užklausas.
+
+NGINX PAVYZDYS (kai turėsi /api/reservations endpointą):
+
+http bloke:
+    limit_req_zone $binary_remote_addr zone=luxora_reservations:10m rate=20r/m;
+
+server bloke:
+    location /api/reservations {
+        limit_req zone=luxora_reservations burst=1 nodelay;
+        proxy_pass http://127.0.0.1:9000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+20r/m yra maždaug 1 rezervacijos užklausa kas 3 sekundes vienam IP.
+Backend pusėje papildomai rekomenduojama:
+- limitas pagal account / session / IP;
+- atominiu būdu mažinti prekės likutį duomenų bazėje;
+- neleisti tam pačiam vartotojui turėti neriboto kiekio aktyvių rezervacijų;
+- CAPTCHA arba challenge tik tada, kai matomas įtartinas srautas;
+- loginti atmestas užklausas ir klaidas.

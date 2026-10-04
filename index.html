@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="lt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b0d0a" />
+  <meta name="description" content="Luxora Resells — riboto kiekio streetwear, sneakers ir aksesuarų pirkimas internetu." />
+  <title>Luxora Resells — Resell marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Permanent+Marker&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=11" />
+</head>
+<body>
+  <div class="noise"></div>
+  <div class="cursor-glow" id="cursorGlow"></div>
+
+  <header class="topbar">
+    <div class="container nav">
+      <a class="brand" href="#top" aria-label="Luxora Resells pradžia">
+        <img src="assets/luxora-logo.png" alt="Luxora Resells" />
+        <div class="brand-copy">
+          <strong>LUXORA</strong>
+          <span>RESELLS</span>
+        </div>
+      </a>
+
+      <nav class="nav-links" aria-label="Pagrindinė navigacija">
+        <a href="#shop">Parduotuvė</a>
+        <a href="#drops">Nauji dropai</a>
+        <a href="#how">Kaip veikia</a>
+      </nav>
+
+      <div class="nav-actions">
+        <button class="icon-btn" id="searchFocusBtn" aria-label="Paieška">⌕</button>
+        <button class="reservations-btn" id="openReservations">
+          Krepšelis <span id="reservationCount">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero container">
+      <div class="hero-copy">
+        <div class="eyebrow"><span></span> LUXORA DROP SYSTEM</div>
+        <h1>Rask. <em>Pirk.</em><br />Gauk į paštomatą.</h1>
+        <p>
+          Riboto kiekio streetwear, sneakers ir aksesuarai vienoje vietoje.
+          Matyk gyvą likutį, rinkis dydį ir užsisakyk su pristatymu į paštomatą.
+        </p>
+        <div class="hero-actions">
+          <a href="#shop" class="btn btn-primary">Žiūrėti prekes <span>↗</span></a>
+          <button class="btn btn-ghost" id="scrollDrops">Naujausi dropai</button>
+        </div>
+        <div class="hero-stats">
+          <div><strong>1–2 D.D.</strong><span>Išsiuntimas</span></div>
+          <div><strong>&lt; 1 min</strong><span>Greitas užsakymas</span></div>
+          <div><strong>LIVE</strong><span>Realaus laiko likučiai</span></div>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="hero-card hero-card-main">
+          <img src="assets/luxora-logo.png" alt="Luxora Resells vizualas" />
+          <div class="hero-card-shade"></div>
+                    <span class="sticker sticker-2">NEW DROP</span>
+        </div>
+        <div class="float-card float-stock">
+          <span class="status-dot"></span>
+          <div><b>LIVE STOCK</b><small>Atnaujinama realiu laiku</small></div>
+        </div>
+        <div class="float-card float-rating">
+          <b>5/5</b><small>community score</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="feature-rail" aria-label="Luxora privalumai">
+      <div class="container feature-rail-grid">
+        <div class="feature-rail-item">
+          <span class="rail-index">01</span>
+          <div><b>Aiškūs listingai</b><small>Dydžiai, kaina ir būklė vienoje vietoje</small></div>
+        </div>
+        <div class="feature-rail-item">
+          <span class="rail-index">02</span>
+          <div><b>Gyvas likutis</b><small>Dydžiai atsinaujina iškart</small></div>
+        </div>
+        <div class="feature-rail-item">
+          <span class="rail-index">03</span>
+          <div><b>Greitas pirkimas</b><small>Prekę į krepšelį įdėsi per kelias sekundes</small></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="shop container" id="shop">
+      <div class="section-head">
+        <div>
+          <span class="section-kicker">01 / SHOP</span>
+          <h2>Šiuo metu <em>sandėlyje</em></h2>
+        </div>
+      </div>
+
+      <div class="shop-toolbar">
+        <label class="search-box">
+          <span>⌕</span>
+          <input id="searchInput" type="search" placeholder="Ieškoti Nike, hoodie, kepurės..." autocomplete="off" />
+          <kbd>/</kbd>
+        </label>
+        <select id="sortSelect" aria-label="Rikiavimas">
+          <option value="featured">Rekomenduojama</option>
+          <option value="low">Kaina: nuo mažiausios</option>
+          <option value="high">Kaina: nuo didžiausios</option>
+          <option value="stock">Daugiausia likučio</option>
+        </select>
+      </div>
+
+      <div class="chips" id="categoryChips">
+        <button class="chip active" data-category="all">Visos</button>
+        <button class="chip" data-category="Sneakers">Sneakers</button>
+        <button class="chip" data-category="Streetwear">Streetwear</button>
+        <button class="chip" data-category="Accessories">Aksesuarai</button>
+      </div>
+
+      <div class="product-grid" id="productGrid" aria-live="polite"></div>
+      <div class="empty-state" id="emptyState" hidden>
+        <h3>Nieko neradome</h3>
+        <p>Pabandyk kitą paiešką arba kategoriją.</p>
+      </div>
+    </section>
+
+    <section class="drops" id="drops">
+      <div class="container drops-wrap">
+        <div class="drops-copy">
+          <span class="section-kicker">02 / NEXT DROP</span>
+          <h2>Kitas dropas<br /><em id="dropDateLabel">kraunama...</em></h2>
+          <p>Ribotas kiekis. Užsiregistruok į drop alert ir sužinok pirmas.</p>
+          <form id="dropForm" class="notify-form">
+            <input type="email" id="dropEmail" placeholder="tavo@email.lt" required />
+            <button class="btn btn-primary" type="submit">Priminti</button>
+          </form>
+          <small id="dropMessage" role="status"></small>
+        </div>
+        <div class="countdown-card">
+          <span>NEXT DROP IN</span>
+          <div class="countdown" id="countdown">
+            <div><b id="days">00</b><small>Dienos</small></div>
+            <div><b id="hours">00</b><small>Val.</small></div>
+            <div><b id="minutes">00</b><small>Min.</small></div>
+            <div><b id="seconds">00</b><small>Sek.</small></div>
+          </div>
+          <div class="drop-tags"><span>JORDAN</span><span>NIKE</span><span>STÜSSY</span><span>CARHARTT</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="how container" id="how">
+      <div class="section-head">
+        <div>
+          <span class="section-kicker">03 / KAIP VEIKIA</span>
+          <h2>Paprasta kaip <em>1—2—3</em></h2>
+        </div>
+      </div>
+      <div class="steps">
+        <article><span>01</span><h3>Išsirink</h3><p>Rask norimą prekę ir pasirink dydį. Likutis rodomas iškart.</p></article>
+        <article><span>02</span><h3>Pirk</h3><p>Paspausk „Pirkti“, įsidėk į krepšelį ir užpildyk užsakymą.</p></article>
+        <article><span>03</span><h3>Apmokėk ir gauk</h3><p>Apmokėk bankiniu pavedimu — išsiunčiame per 1–2 d. d.</p></article>
+      </div>
+    </section>
+
+    <section class="trust">
+      <div class="container trust-grid">
+        <div><b>REAL STOCK</b><span>Rodomas faktinis likutis pagal dydžius.</span></div>
+        <div><b>SAFE PAYMENT</b><span>Bankinis pavedimas.</span></div>
+        <div><b>COMMUNITY</b><span>Sukurta resell bendruomenei.</span></div>
+      </div>
+    </section>
+
+    <section class="reputation container" id="reputation">
+      <div class="section-head">
+        <div>
+          <span class="section-kicker">04 / REPUTACIJA</span>
+          <h2><em>⭐</em> Atsiliepimai</h2>
+        </div>
+        <p>REPUTACIJA | Luxora Resell — skaičiuojama iš Discord kanalo automatiškai.</p>
+      </div>
+      <div class="rep-card">
+        <div class="rep-stars" aria-label="5 iš 5">★★★★★</div>
+        <div class="rep-count">Dabar turime <b id="repCount">…</b> teigiamų atsiliepimų</div>
+        <div class="rep-carousel" id="repCarousel" hidden>
+          <button type="button" class="rep-arrow" id="repPrev" aria-label="Ankstesnis">‹</button>
+          <div class="rep-slide" id="repSlide"></div>
+          <button type="button" class="rep-arrow" id="repNext" aria-label="Kitas">›</button>
+        </div>
+        <div class="rep-dots" id="repDots"></div>
+        <small class="rep-updated" id="repUpdated"></small>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <img src="assets/luxora-logo.png" alt="Luxora Resells" />
+        <div><b>LUXORA RESELLS</b></div>
+      </div>
+      <div class="footer-links">
+        <a href="#shop">Parduotuvė</a>
+        <a href="#how">Kaip veikia</a>
+        <a href="https://discord.gg/bVQvWsbyxR" target="_blank" rel="noopener">Discord</a>
+        <a href="admin.html" class="admin-link">Admin</a>
+      </div>
+      <div class="footer-note">© <span id="year"></span> Luxora Resells. Demo storefront.</div>
+    </div>
+  </footer>
+
+  <div class="modal-backdrop" id="productModal" hidden>
+    <div class="modal product-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" data-close="productModal" aria-label="Uždaryti">×</button>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <aside class="drawer" id="reservationDrawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div><span>MANO</span><h3>Krepšelis</h3></div>
+      <button id="closeReservations" aria-label="Uždaryti">×</button>
+    </div>
+    <div class="drawer-body" id="reservationList"></div>
+    <div class="drawer-footer">
+      <div class="drawer-hint">LP Express / Omniva / DPD · bankinis pavedimas</div>
+    </div>
+  </aside>
+  <div class="drawer-overlay" id="drawerOverlay" hidden></div>
+
+  <div class="modal-backdrop" id="checkoutModal" hidden>
+    <div class="modal checkout-modal" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle">
+      <button class="modal-close" data-close="checkoutModal" aria-label="Uždaryti">×</button>
+      <div id="checkoutContent"></div>
+    </div>
+  </div>
+
+  <button class="chat-launcher" id="chatLauncher" aria-label="Atidaryti pokalbį su pardavėju">
+    <span class="chat-live-dot"></span> Pagalba
+    <b id="chatUnread" hidden>0</b>
+  </button>
+
+  <section class="buyer-chat" id="buyerChat" aria-hidden="true">
+    <div class="buyer-chat-head">
+      <div>
+        <span class="chat-status"><i></i> LUXORA SUPPORT</span>
+        <h3>Parašyk pardavėjui</h3>
+      </div>
+      <button id="closeBuyerChat" aria-label="Uždaryti pokalbį">×</button>
+    </div>
+    <div class="buyer-chat-intro" id="buyerChatIntro">
+      <p>Reikia pagalbos dėl dydžio, prekės ar užsakymo? Parašyk — atsakymas atsiras čia.</p>
+      <label>Tavo vardas<input id="buyerName" maxlength="40" placeholder="Pvz. Mantas" /></label>
+    </div>
+    <div class="buyer-chat-messages" id="buyerChatMessages"></div>
+    <form class="buyer-chat-form" id="buyerChatForm">
+      <input id="buyerChatInput" maxlength="600" placeholder="Rašyk žinutę..." autocomplete="off" />
+      <button type="submit">Siųsti</button>
+    </form>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="store.js?v=10"></script>
+  <script src="app.js?v=10"></script>
+</body>
+</html>

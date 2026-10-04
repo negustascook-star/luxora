@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="lt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0a0c09" />
+  <title>Luxora Resells — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Permanent+Marker&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css?v=9" />
+</head>
+<body>
+  <div class="admin-noise"></div>
+
+  <div class="login-screen" id="loginScreen">
+    <form class="login-card" id="loginForm">
+      <a href="index.html" class="login-brand"><img src="assets/luxora-logo.png" alt="Luxora"><span><b>LUXORA</b><em>ADMIN</em></span></a>
+      <div class="login-tag">CONTROL CENTER</div>
+      <h1>Administratoriaus<br><span>skydelis</span></h1>
+      <p>Valdyk prekes, likučius, rezervacijas, dropą ir pirkėjų žinutes vienoje vietoje.</p>
+      <label>Slaptažodis<input id="adminPassword" type="password" placeholder="Įvesk slaptažodį" autocomplete="current-password" /></label>
+      <button type="submit">Prisijungti <span>→</span></button>
+      <small id="loginError"></small>
+    </form>
+  </div>
+
+  <div class="admin-shell" id="adminShell" hidden>
+    <aside class="sidebar">
+      <a class="admin-brand" href="index.html">
+        <img src="assets/luxora-logo.png" alt="Luxora Resells" />
+        <div><b>LUXORA</b><span>ADMIN PANEL</span></div>
+      </a>
+      <nav id="adminNav">
+        <button class="active" data-view="overview"><i>⌂</i><span>Apžvalga</span></button>
+        <button data-view="products"><i>◫</i><span>Prekės</span><b id="navProductCount">0</b></button>
+        <button data-view="messages"><i>◌</i><span>Žinutės</span><b id="navUnread" hidden>0</b></button>
+        <button data-view="reservations"><i>◇</i><span>Užsakymai</span><b id="navReservationCount">0</b></button>
+        <button data-view="drop"><i>⌁</i><span>Kitas dropas</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <a href="index.html" target="_blank">Atidaryti parduotuvę ↗</a>
+        <button id="logoutBtn">Atsijungti</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <div>
+          <span id="viewEyebrow">DASHBOARD</span>
+          <h1 id="viewTitle">Apžvalga</h1>
+        </div>
+        <div class="admin-top-actions">
+          <span class="live-badge"><i></i> LIVE</span>
+          <button id="quickAddProduct">+ Nauja prekė</button>
+        </div>
+      </header>
+
+      <section class="admin-view active" id="view-overview">
+        <article class="admin-welcome">
+          <div class="admin-welcome-copy">
+            <span class="welcome-kicker">LUXORA CONTROL CENTER</span>
+            <h2>Viskas vienoje <em>vietoje.</em></h2>
+            <p>Įkelk prekes, valdyk likučius, atsakyk pirkėjams ir pasiruošk kitam dropui.</p>
+            <div class="welcome-actions">
+              <button type="button" data-goto="products">Valdyti prekes <span>→</span></button>
+              <button type="button" class="ghost" data-goto="messages">Atidaryti žinutes</button>
+            </div>
+          </div>
+          <div class="admin-welcome-side">
+            <span class="system-pill"><i></i> SISTEMA VEIKIA</span>
+            <b>LIVE</b>
+            <small>bendras katalogas</small>
+          </div>
+        </article>
+
+        <div class="metric-grid">
+          <article><span>PREKIŲ</span><strong id="metricProducts">0</strong><small>aktyvūs listingai</small></article>
+          <article><span>LIKUČIO</span><strong id="metricStock">0</strong><small>vnt. sandėlyje</small></article>
+          <article><span>REZERVACIJŲ</span><strong id="metricReservations">0</strong><small>nauji užsakymai</small></article>
+          <article><span>NEPERSKAITYTA</span><strong id="metricUnread">0</strong><small>pirkėjų žinutės</small></article>
+        </div>
+
+        <div class="overview-grid">
+          <article class="panel drop-preview-panel">
+            <div class="panel-head"><div><span>NEXT DROP</span><h2>Kiek liko iki dropo</h2></div><button data-goto="drop">Keisti</button></div>
+            <div class="admin-countdown">
+              <div><b id="adminDays">00</b><small>Dienos</small></div>
+              <div><b id="adminHours">00</b><small>Val.</small></div>
+              <div><b id="adminMinutes">00</b><small>Min.</small></div>
+              <div><b id="adminSeconds">00</b><small>Sek.</small></div>
+            </div>
+            <p id="adminDropLabel"></p>
+          </article>
+
+          <article class="panel activity-panel">
+            <div class="panel-head"><div><span>INBOX</span><h2>Naujausi pokalbiai</h2></div><button data-goto="messages">Visos žinutės</button></div>
+            <div id="overviewChats" class="mini-list"></div>
+          </article>
+        </div>
+
+        <article class="panel overview-products">
+          <div class="panel-head"><div><span>STOCK</span><h2>Mažiausias likutis</h2></div><button data-goto="products">Valdyti prekes</button></div>
+          <div id="lowStockList" class="low-stock-list"></div>
+        </article>
+      </section>
+
+      <section class="admin-view" id="view-products">
+        <article class="panel">
+          <div class="panel-head product-head">
+            <div><span>CATALOG</span><h2>Prekių valdymas</h2></div>
+            <div class="product-tools"><input id="adminProductSearch" type="search" placeholder="Ieškoti prekės..."/><button id="addProductBtn">+ Pridėti prekę</button></div>
+          </div>
+          <div class="table-wrap">
+            <table class="product-table">
+              <thead><tr><th>Prekė</th><th>Kategorija</th><th>Kaina</th><th>Likutis</th><th>Žyma</th><th></th></tr></thead>
+              <tbody id="productTableBody"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="admin-view" id="view-messages">
+        <div class="messages-layout panel">
+          <aside class="conversation-list-wrap">
+            <div class="conversation-title"><div><span>INBOX</span><h2>Pirkėjai</h2></div><b id="conversationCount">0</b></div>
+            <div id="conversationList" class="conversation-list"></div>
+          </aside>
+          <div class="admin-chat-area">
+            <div id="adminChatEmpty" class="admin-chat-empty"><b>Pasirink pokalbį</b><span>Čia matysi pirkėjo žinutes ir galėsi atsakyti.</span></div>
+            <div id="adminChatContent" class="admin-chat-content" hidden>
+              <header><div><span id="chatBuyerInitial">?</span><div><b id="chatBuyerName">Pirkėjas</b><small id="chatBuyerMeta"></small></div></div><button id="deleteConversation">Ištrinti pokalbį</button></header>
+              <div class="admin-chat-messages" id="adminChatMessages"></div>
+              <form id="adminChatForm"><input id="adminChatInput" maxlength="600" placeholder="Atsakyti pirkėjui..." autocomplete="off"/><button type="submit">Siųsti</button></form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="admin-view" id="view-reservations">
+        <article class="panel">
+          <div class="panel-head"><div><span>ORDERS</span><h2>Užsakymai</h2></div><button id="clearExpiredBtn">Atnaujinti</button></div>
+          <div id="adminReservations" class="reservation-admin-list"></div>
+        </article>
+      </section>
+
+      <section class="admin-view" id="view-drop">
+        <div class="drop-settings-grid">
+          <article class="panel">
+            <div class="panel-head"><div><span>DROP SETTINGS</span><h2>Nustatyti kitą dropą</h2></div></div>
+            <form id="dropSettingsForm" class="settings-form">
+              <label>Data ir laikas<input id="dropDateInput" type="datetime-local" required /></label>
+              <p>Ši data iškart bus rodoma pagrindinio puslapio „Next drop“ laikmatyje.</p>
+              <button type="submit">Išsaugoti dropą</button>
+              <small id="dropSaveMessage"></small>
+            </form>
+          </article>
+          <article class="panel drop-side-preview">
+            <span>LIVE PREVIEW</span>
+            <h2 id="dropPreviewTitle">Kitas dropas</h2>
+            <div class="admin-countdown compact">
+              <div><b id="dropDays">00</b><small>D</small></div><div><b id="dropHours">00</b><small>H</small></div><div><b id="dropMinutes">00</b><small>M</small></div><div><b id="dropSeconds">00</b><small>S</small></div>
+            </div>
+            <p id="dropPreviewDate"></p>
+          </article>
+        </div>
+        <article class="panel" style="margin-top:14px">
+          <div class="panel-head"><div><span>SECURITY</span><h2>Keisti admin slaptažodį</h2></div></div>
+          <form id="passwordForm" class="settings-form">
+            <label>Dabartinis slaptažodis<input id="pwCurrent" type="password" autocomplete="current-password" required /></label>
+            <label>Naujas (min. 8 simboliai)<input id="pwNext" type="password" autocomplete="new-password" required /></label>
+            <label>Pakartok naują<input id="pwNext2" type="password" autocomplete="new-password" required /></label>
+            <button type="submit">Pakeisti slaptažodį</button>
+            <small id="pwMessage"></small>
+          </form>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div class="admin-modal-backdrop" id="productEditor" hidden>
+    <form class="product-editor" id="productForm">
+      <header><div><span>PRODUCT EDITOR</span><h2 id="productEditorTitle">Nauja prekė</h2></div><button type="button" id="closeProductEditor">×</button></header>
+      <input type="hidden" id="productId" />
+      <div class="form-grid">
+        <label class="wide">Pavadinimas<input id="productName" required placeholder="Nike Dunk Low..." /></label>
+        <label>Kategorija<select id="productCategory"><option>Sneakers</option><option>Streetwear</option><option>Accessories</option></select></label>
+        <label>Kaina €<input id="productPrice" type="number" step="0.01" min="0" required /></label>
+        <label>Žyma<input id="productBadge" placeholder="NEW / LIMITED" /></label>
+        <label>Tipas<select id="productType"><option value="shoe">Sneaker</option><option value="shoe2">Jordan / chunky</option><option value="hoodie">Hoodie</option><option value="tee">T-shirt</option><option value="beanie">Beanie</option><option value="pants">Pants</option></select></label>
+        <label class="wide">Dydžiai ir likutis<input id="productSizes" required placeholder="40:2, 41:1, 42:0 arba S:2, M:3" /><small>Formatas: DYDIS:KIEKIS, DYDIS:KIEKIS</small></label>
+        <label class="wide image-upload-label">Nuotraukos <span class="image-limit">1–5</span>
+          <div class="image-dropzone" id="imageDropzone">
+            <input id="productImages" type="file" accept="image/*" multiple />
+            <div class="image-dropzone-copy">
+              <b>+ Įkelti nuotraukas</b>
+              <span>Pasirink 1–5 nuotraukas. Pirma nuotrauka bus pagrindinė.</span>
+            </div>
+          </div>
+          <div class="image-preview-grid" id="productImagePreviews"></div>
+          <small id="imageHelp">Galima įkelti JPG, PNG ar WEBP. Nuotraukos automatiškai sumažinamos, kad svetainė veiktų greitai.</small>
+        </label>
+        <label>Fono spalva<input id="productBg" type="color" value="#20261b" /></label>
+        <label class="check-label"><input id="productHot" type="checkbox" /> Rodyti kaip HOT</label>
+        <label class="wide">Aprašymas<textarea id="productDescription" rows="4" placeholder="Trumpas prekės aprašymas..."></textarea></label>
+      </div>
+      <footer><button type="button" class="secondary" id="cancelProductEditor">Atšaukti</button><button type="submit">Išsaugoti prekę</button></footer>
+    </form>
+  </div>
+
+  <div class="admin-toast" id="adminToast"></div>
+  <script src="store.js?v=9"></script>
+  <script src="admin.js?v=10"></script>
+</body>
+</html>
