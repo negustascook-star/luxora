@@ -13,6 +13,14 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
 
   const DEFAULT_ADMIN_PASSWORD = 'admin123';
 
+  /* Atsiliepimai iš Discord: puslapis pats negali kviesti Discord API
+     (naršyklė blokuoja, o boto tokenas viešame kode būtų pavogtas).
+     Todėl reikia tarpinio Worker (žr. REPUTATION_SETUP.txt).
+     Kai Worker paleistas, įrašyk jo URL čia ARBA naršyklėje:
+     window.LUXORA_REPUTATION_URL = 'https://xxx.workers.dev' */
+  const REPUTATION_API_URL =
+    (typeof window !== 'undefined' && window.LUXORA_REPUTATION_URL) || '';
+
   const KEYS = {
     cart: 'luxora_cart_v1',
     favorites: 'luxora_favorites_v6',
@@ -188,12 +196,13 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
     return defaultDropDate();
   }
 
-  /* ---------- reputacija (Discord, per serverį) ---------- */
+  /* ---------- reputacija (Discord, per serverį/Worker) ---------- */
   let repCache = null;
   async function getReputation(){
-    if(STATIC_MODE) return repCache;
+    const url = REPUTATION_API_URL || (!STATIC_MODE ? '/api/reputation' : null);
+    if(!url) return repCache;
     try {
-      const r = await fetch('/api/reputation');
+      const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
       if(r.ok){ repCache = await r.json(); document.dispatchEvent(new CustomEvent('luxora:rep')); }
     } catch(e){}
     return repCache;

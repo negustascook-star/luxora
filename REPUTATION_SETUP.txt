@@ -1,0 +1,41 @@
+LUXORA — ATSILIEPIMAI IŠ DISCORD (REPUTACIJA)
+=============================================
+Skiltis "Atsiliepimai" puslapyje skaito +rep žinutes iš Discord kanalo.
+Naršyklė pati to daryti negali (Discord blokuoja + tokenas viešame
+kode būtų pavogtas per minutes), todėl reikia nemokamo tarpininko:
+Cloudflare Worker. Tokenas saugomas tik Cloudflare Secrets — NIEKADA
+nedėk boto tokeno į GitHub failus.
+
+1) BOTAS SERVEYJE
+   - Discord Developer Portal -> tavo aplikacija -> Bot -> tokeną jau turi.
+   - OAuth2 -> URL Generator: scopes [bot], permissions [View Channel,
+     Read Message History] -> atidaryk sugeneruotą linką ir pakviesk
+     botą į serverį (guild id: 1458179076190769287).
+   - Kanale (channel id: 1458541073164013741) botas turi matyti kanalą.
+
+2) WORKER SUKŪRIMAS (nemokama)
+   - Užsiregistruok https://dash.cloudflare.com (Free planas tinka).
+   - Kairėje: Workers & Pages -> Create -> Create Worker -> Deploy.
+   - Edit code: ištrink viską, įklijuok failą reputation-worker.js
+     iš šito repo -> Save and deploy.
+   - Settings -> Variables -> Add variable:
+       Type: Secret, Name: DISCORD_BOT_TOKEN, Value: <tavo boto tokenas>
+       (Secret, NE Text — kad niekas nematytų.)
+     Jei kitas kanalas: Add variable Type Text, Name CHANNEL_ID.
+   - Nukopijuok Worker URL, pvz: https://luxora-rep.xxx.workers.dev
+   - Patikrink naršyklėje: atidarius URL turi grąžinti JSON:
+     {"positive":N,"reviews":[...],"updated_at":"..."}
+     Jei error apie tokeną/kanalą — sutvarkyk 1) ir 2) žingsnius.
+
+3) PUSLAPIO PRIJUNGIMAS
+   - store.js viršuje rask REPUTATION_API_URL ir įrašyk Worker URL,
+     pvz: const REPUTATION_API_URL = 'https://luxora-rep.xxx.workers.dev';
+     (arba nieko nekeisk faile — užtenka naršyklės konsolėje palaikyti
+     window.LUXORA_REPUTATION_URL, bet po perkrovimo išsitrins.)
+   - Pakelk ?v= versiją index.html (store.js?v=..), commit + push.
+   - Po ~1 min skiltis "Atsiliepimai" rodys skaičių ir karuselę.
+     Be Worker URL ten rodys "—" (kaip dabar).
+
+SVARBU: boto tokeną laikyk tik Cloudflare Secrets ir Discord portale.
+Jei tokenas buvo kur nors įklijuotas viešai (chat, git) — Developer
+Portale spausk Reset Token ir atnaujink Secret.
