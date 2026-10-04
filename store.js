@@ -14,10 +14,11 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
   const DEFAULT_ADMIN_PASSWORD = 'admin123';
 
   /* Atsiliepimai iš Discord: puslapis pats negali kviesti Discord API
-     (naršyklė blokuoja, o boto tokenas viešame kode būtų pavogtas).
-     Todėl reikia tarpinio Worker (žr. REPUTATION_SETUP.txt).
-     Kai Worker paleistas, įrašyk jo URL čia ARBA naršyklėje:
-     window.LUXORA_REPUTATION_URL = 'https://xxx.workers.dev' */
+     (naršyklė blokuoja CORS, o boto tokenas viešame kode būtų pavogtas).
+     Todėl užklausa eina per Worker-tarpininką (žr. REPUTATION_SETUP.txt).
+     Worker URL ima iš admin panelės nustatymų, čia – tik atsarginis.
+     Bot tokenas saugomas TIK admino naršyklės localStorage
+     (įvedama per admin panelę, niekada nepatenka į git). */
   const REPUTATION_API_URL =
     (typeof window !== 'undefined' && window.LUXORA_REPUTATION_URL) || '';
 
@@ -31,7 +32,11 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
     orders: 'luxora_orders_v6',
     version: 'luxora_version_v6',
     adminPw: 'luxora_admin_pw_v6',
-    adminSession: 'luxora_admin_session_v6'
+    adminSession: 'luxora_admin_session_v6',
+    dcWorker: 'luxora_dc_worker_v6',
+    dcToken: 'luxora_dc_token_v6',
+    dcChannel: 'luxora_dc_channel_v6',
+    dcStatus: 'luxora_dc_status_v6'
   };
 
   const DELIVERY = {
@@ -196,15 +201,84 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
     return defaultDropDate();
   }
 
-  /* ---------- reputacija (Discord, per serverį/Worker) ---------- */
+  /* ---------- reputacija iš Discord (admin panelė + Worker) ---------- */
+  const DEFAULT_DC_CHANNEL = '1458541073164013741';
+  function getDiscordConfig(){
+    let worker = '', token = '', channel = DEFAULT_DC_CHANNEL;
+    try {
+      worker = (localStorage.getItem(KEYS.dcWorker) || '').trim();
+      token = (localStorage.getItem(KEYS.dcToken) || '').trim();
+      channel = (localStorage.getItem(KEYS.dcChannel) || '').trim() || DEFAULT_DC_CHANNEL;
+    } catch(e){}
+    if(!worker) worker = REPUTATION_API_URL;
+    return { worker, token, channel };
+  }
+  function saveDiscordConfig({ worker = '', token = '', channel = '' } = {}){
+    try {
+      localStorage.setItem(KEYS.dcWorker, String(worker == null ? '' : worker).trim());
+      if(token) localStorage.setItem(KEYS.dcToken, String(token).trim());
+      localStorage.setItem(KEYS.dcChannel, String(channel == null ? '' : channel).trim() || DEFAULT_DC_CHANNEL);
+    } catch(e){ throw new Error('Nepavyko išsaugoti — naršyklės atmintis nepasiekiama.'); }
+    repCache = null;
+  }
+  function clearDiscordToken(){ try { localStorage.removeItem(KEYS.dcToken); } catch(e){} repCache = null; }
+  function readDcStatus(){
+    try {
+      const v = JSON.parse(localStorage.getItem(KEYS.dcStatus) || 'null');
+      return v && typeof v === 'object' ? v : {};
+    } catch(e){ return {}; }
+  }
+  function writeDcStatus(patch){
+    try { localStorage.setItem(KEYS.dcStatus, JSON.stringify({ ...readDcStatus(), ...patch })); } catch(e){}
+  }
+  function getDiscordStatus(){
+    const cfg = getDiscordConfig();
+    const st = readDcStatus();
+    return {
+      workerSet: !!cfg.worker,
+      tokenSet: !!cfg.token,
+      channel: cfg.channel,
+      lastCheck: st.lastCheck || 0,
+      lastCount: typeof st.lastCount === 'number' ? st.lastCount : null,
+      lastError: st.lastError || ''
+    };
+  }
+  async function fetchReputation(url, extraHeaders){
+    let ctrl = null, timer = null;
+    try {
+      if(typeof AbortController !== 'undefined'){
+        ctrl = new AbortController();
+        timer = setTimeout(() => { try { ctrl.abort(); } catch(e){} }, 15000);
+      }
+      const r = await fetch(url, { headers: { 'Accept': 'application/json', ...(extraHeaders || {}) }, ...(ctrl ? { signal: ctrl.signal } : {}) });
+      const data = await r.json().catch(() => ({}));
+      if(r.ok && data && typeof data.positive === 'number') return data;
+      throw new Error((data && data.error) || `Reputacijos klaida: HTTP ${r.status}`);
+    } finally { if(timer) clearTimeout(timer); }
+  }
   let repCache = null;
   async function getReputation(){
-    const url = REPUTATION_API_URL || (!STATIC_MODE ? '/api/reputation' : null);
-    if(!url) return repCache;
+    const cfg = getDiscordConfig();
     try {
-      const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
-      if(r.ok){ repCache = await r.json(); document.dispatchEvent(new CustomEvent('luxora:rep')); }
-    } catch(e){}
+      if(cfg.worker && cfg.token){
+        // Pagrindinis kelias: tokenas iš admin panelės, užklausa per Worker.
+        const endpoint = `${cfg.worker.replace(/\/+$/, '')}/?channel=${encodeURIComponent(cfg.channel)}`;
+        const data = await fetchReputation(endpoint, { Authorization: `Bot ${cfg.token}` });
+        repCache = data;
+        writeDcStatus({ lastCheck: Date.now(), lastCount: data.positive, lastError: '' });
+        try { document.dispatchEvent(new CustomEvent('luxora:rep')); } catch(e){}
+        return repCache;
+      }
+      if(REPUTATION_API_URL){
+        // Atsarginis kelias: tokenas Worker Secrets (savo serveris).
+        const data = await fetchReputation(REPUTATION_API_URL);
+        repCache = data;
+        try { document.dispatchEvent(new CustomEvent('luxora:rep')); } catch(e){}
+        return repCache;
+      }
+    } catch(e){
+      writeDcStatus({ lastCheck: Date.now(), lastError: e.message || 'Nežinoma klaida' });
+    }
     return repCache;
   }
   function readCart(){ try { const v = JSON.parse(localStorage.getItem(KEYS.cart) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
@@ -439,6 +513,6 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
     getProducts, findProduct, refreshProducts, onCatalog, connectLive,
     getDropDate, readCart, addToCart, setQty, clearCart, cartDetailed, cartCount, cartSubtotal,
     createOrder, chats, saveChats, adminLogin, adminMe, adminLogout, apiAdmin, uploadImages,
-    getReputation
+    getReputation, getDiscordConfig, saveDiscordConfig, clearDiscordToken, getDiscordStatus
   };
 })();

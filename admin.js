@@ -41,7 +41,7 @@ async function guard(fn){
 
 const viewMeta={
   overview:['DASHBOARD','Apžvalga'], products:['CATALOG','Prekės'], messages:['INBOX','Žinutės'],
-  reservations:['ORDERS','Užsakymai'], drop:['DROP SYSTEM','Kitas dropas']
+  reservations:['ORDERS','Užsakymai'], drop:['DROP SYSTEM','Kitas dropas'], discord:['DISCORD','Atsiliepimai iš Discord']
 };
 function switchView(view){
   activeView=view;
@@ -53,6 +53,7 @@ function switchView(view){
   if(view==='products') renderProductTable();
   if(view==='reservations') renderOrders();
   if(view==='drop') syncDropInput();
+  if(view==='discord') loadDiscordForm();
 }
 document.querySelector('#adminNav').addEventListener('click',e=>{ const b=e.target.closest('[data-view]'); if(b) switchView(b.dataset.view); });
 document.addEventListener('click',e=>{ const b=e.target.closest('[data-goto]'); if(b) switchView(b.dataset.goto); });
@@ -372,6 +373,64 @@ document.querySelector('#dropSettingsForm').addEventListener('submit',e=>{
   });
 });
 
+/* ---------- discord reputacija ---------- */
+function localDcToken(){
+  try { return localStorage.getItem(S.KEYS.dcToken) || ''; } catch(e){ return ''; }
+}
+function loadDiscordForm(){
+  const cfg = S.getDiscordConfig();
+  const w = document.querySelector('#dcWorkerUrl');
+  const t = document.querySelector('#dcBotToken');
+  const c = document.querySelector('#dcChannelId');
+  if(!w || !t || !c) return;
+  w.value = cfg.worker || '';
+  t.value = localDcToken();
+  c.value = cfg.channel || '';
+  renderDiscordStatus();
+}
+function renderDiscordStatus(){
+  const line = document.querySelector('#dcStatusLine');
+  const count = document.querySelector('#dcRepCount');
+  if(!line || !count) return;
+  const st = S.getDiscordStatus();
+  count.textContent = st.lastCount == null ? '—' : String(st.lastCount);
+  const parts = [];
+  if(!st.workerSet) parts.push('Nėra Worker URL.');
+  if(!st.tokenSet) parts.push('Neįvestas bot tokenas.');
+  if(st.lastError) parts.push('Klaida: ' + st.lastError);
+  if(st.lastCheck) parts.push('Tikrinta: ' + new Intl.DateTimeFormat('lt-LT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(st.lastCheck)));
+  line.textContent = parts.length ? parts.join(' ') : 'Veikia — kanalas tikrinamas kas 30 s.';
+}
+document.querySelector('#discordSettingsForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  guard(async ()=>{
+    const tokenInput = document.querySelector('#dcBotToken').value.trim();
+    const prev = S.getDiscordConfig();
+    S.saveDiscordConfig({
+      worker: document.querySelector('#dcWorkerUrl').value,
+      token: tokenInput || prev.token,
+      channel: document.querySelector('#dcChannelId').value
+    });
+    document.querySelector('#dcSaveMessage').textContent = 'Išsaugota. Tikrinama...';
+    await S.getReputation();
+    renderDiscordStatus();
+    document.querySelector('#dcSaveMessage').textContent = 'Išsaugota.';
+    toast('Discord nustatymai išsaugoti');
+  });
+});
+document.querySelector('#discordTestBtn').addEventListener('click',()=>guard(async ()=>{
+  await S.getReputation();
+  renderDiscordStatus();
+  toast('Patikrinta');
+}));
+document.querySelector('#discordForgetBtn').addEventListener('click',()=>{
+  S.clearDiscordToken();
+  const t = document.querySelector('#dcBotToken');
+  if(t) t.value = '';
+  renderDiscordStatus();
+  toast('Tokenas ištrintas iš naršyklės');
+});
+
 document.querySelector('#passwordForm').addEventListener('submit',e=>{
   e.preventDefault();
   guard(async ()=>{
@@ -390,7 +449,7 @@ document.querySelector('#passwordForm').addEventListener('submit',e=>{
 
 function renderAll(){
   renderMetrics(); renderOverviewChats(); renderLowStock(); renderProductTable(); renderConversationList();
-  if(activeView==='messages') renderActiveChat(false); renderOrders(); renderDropTimer(); syncDropInput();
+  if(activeView==='messages') renderActiveChat(false); renderOrders(); renderDropTimer(); syncDropInput(); renderDiscordStatus();
 }
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!productEditor.hidden)closeProductEditor();});
@@ -408,4 +467,4 @@ try {
   es.addEventListener('orders', async ()=>{ try { if(await S.adminMe()){ await loadOrders(); if(!adminShell.hidden) renderAll(); } } catch(e){} });
   es.onerror = ()=>{ try{es.close();}catch(e){} };
 } catch(e){}
-setInterval(()=>{ if(!adminShell.hidden){ renderDropTimer(); if(activeView==='messages'){renderConversationList();renderActiveChat(false);} else {renderMetrics();renderOverviewChats();} } },5000);
+setInterval(()=>{ if(!adminShell.hidden){ renderDropTimer(); if(activeView==='messages'){renderConversationList();renderActiveChat(false);} else {renderMetrics();renderOverviewChats();} if(activeView==='discord'){renderDiscordStatus();} } },5000);

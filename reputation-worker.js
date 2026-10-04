@@ -1,14 +1,22 @@
 /* Luxora reputation Worker (Cloudflare Workers, nemokamas planas).
  *
- * Ką daro: su boto tokenu (saugomu Worker Secrets, NE kode) nuskaito
- * nurodyto Discord kanalo žinutes, suskaičiuoja "+rep" ir grąžina:
+ * Ką daro: nuskaito Discord kanalo žinutes, suskaičiuoja "+rep" ir grąžina:
  *   { positive, reviews: [{name, text, avatar}], updated_at }
- * Puslapis (store.js -> REPUTATION_API_URL) kreipiasi į šį Worker.
+ * Puslapis kreipiasi: GET /?channel=<kanalo ID> (kas 30 s).
  *
- * Secrets (Dashboard -> Worker -> Settings -> Variables -> Secrets):
- *   DISCORD_BOT_TOKEN = boto tokenas iš Discord Developer Portal
- * Vars (Text variables, gali likti default):
- *   CHANNEL_ID = Discord kanalo ID (default: žemiau)
+ * DU REŽIMAI (tokenas NIEKADA nededamas į kodą):
+ *   A) Tokenas Worker Secrets (rekomenduojama jei vienas serveris):
+ *      Dashboard -> Worker -> Settings -> Variables -> Secrets:
+ *      DISCORD_BOT_TOKEN = boto tokenas. Tada puslapis gali kviesti
+ *      be Authorization antraštės.
+ *   B) Tokenas iš admin panelės (lankstus, be Secrets konfigūracijos):
+ *      puslapis siunčia Authorization: Bot <tokenas> antraštę,
+ *      Worker ją tiesiog perduoda į Discord. Tokenas keliauja tik
+ *      HTTPS, niekur neloginamas ir nekešuojamas (kešuojamas tik
+ *      rezultatas pagal kanalą).
+ *
+ * Kanalas: ?channel= parametras, arba Text variable CHANNEL_ID,
+ * arba default žemiau.
  */
 
 const DEFAULT_CHANNEL_ID = '1458541073164013741';
@@ -18,7 +26,7 @@ function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 }
 
@@ -38,6 +46,14 @@ function toReview(msg) {
   return { name, text, avatar: avatarURL(author) };
 }
 
+function extractToken(request, env) {
+  if (env.DISCORD_BOT_TOKEN) return String(env.DISCORD_BOT_TOKEN);
+  const auth = String(request.headers.get('Authorization') || '').trim();
+  if (!auth) return '';
+  const m = auth.match(/^Bot\s+(.+)$/i);
+  return (m ? m[1] : auth).trim();
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
@@ -46,14 +62,18 @@ export default {
     if (request.method !== 'GET') {
       return new Response('Method not allowed', { status: 405, headers: corsHeaders() });
     }
-    if (!env.DISCORD_BOT_TOKEN) {
+    const url = new URL(request.url);
+    const channelId = (url.searchParams.get('channel') || '').trim()
+      || env.CHANNEL_ID
+      || DEFAULT_CHANNEL_ID;
+    const token = extractToken(request, env);
+    if (!token) {
       return Response.json(
-        { error: 'Nesukonfigūruotas DISCORD_BOT_TOKEN (Worker Secrets). Žr. REPUTATION_SETUP.txt' },
-        { status: 500, headers: corsHeaders() }
+        { error: 'Nėra boto tokeno: įvesk jį admin panelės Discord skiltyje arba įdėk į Worker Secrets.' },
+        { status: 400, headers: corsHeaders() }
       );
     }
 
-    const channelId = env.CHANNEL_ID || DEFAULT_CHANNEL_ID;
     const cacheKey = new Request(`https://luxora-reputation/${channelId}`, request);
     try {
       const cache = caches.default;
@@ -69,7 +89,7 @@ export default {
     try {
       const r = await fetch(
         `https://discord.com/api/v10/channels/${channelId}/messages?limit=100`,
-        { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` } }
+        { headers: { Authorization: `Bot ${token}` } }
       );
       if (r.status === 401 || r.status === 403) {
         return Response.json(

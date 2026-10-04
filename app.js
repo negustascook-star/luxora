@@ -500,3 +500,4 @@ S.refreshProducts().then(()=>{ renderProducts(); renderCart(); }).catch(()=>{ sh
 S.connectLive();
 setInterval(updateDropCountdown, 1000);
 setInterval(()=>renderBuyerChat(false), 2000);
+setInterval(()=>{ renderReputation(); }, 30000);

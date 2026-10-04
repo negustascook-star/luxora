@@ -37,6 +37,7 @@
         <button data-view="messages"><i>◌</i><span>Žinutės</span><b id="navUnread" hidden>0</b></button>
         <button data-view="reservations"><i>◇</i><span>Užsakymai</span><b id="navReservationCount">0</b></button>
         <button data-view="drop"><i>⌁</i><span>Kitas dropas</span></button>
+        <button data-view="discord"><i>★</i><span>Discord</span></button>
       </nav>
       <div class="sidebar-bottom">
         <a href="index.html" target="_blank">Atidaryti parduotuvę ↗</a>
@@ -175,6 +176,32 @@
           </form>
         </article>
       </section>
+
+      <section class="admin-view" id="view-discord">
+        <div class="drop-settings-grid">
+          <article class="panel">
+            <div class="panel-head"><div><span>DISCORD API</span><h2>Atsiliepimai iš Discord</h2></div></div>
+            <form id="discordSettingsForm" class="settings-form">
+              <label>Worker URL<input id="dcWorkerUrl" type="url" placeholder="https://....workers.dev" /></label>
+              <label>Bot tokenas<input id="dcBotToken" type="password" placeholder="Įklijuok boto tokeną" autocomplete="off" /></label>
+              <label>Kanalo ID<input id="dcChannelId" placeholder="1458541073164013741" /></label>
+              <p>Puslapis tikrins kanalą kas 30 s ir skaičiuos +rep žinutes. Tokenas saugomas tik šioje naršyklėje — niekur kitur nepatenka, išskyrus tavo Worker per HTTPS.</p>
+              <button type="submit">Išsaugoti</button>
+              <small id="dcSaveMessage"></small>
+            </form>
+          </article>
+          <article class="panel drop-side-preview">
+            <span>LIVE STATUS</span>
+            <h2 id="dcPreviewTitle">Reputacija</h2>
+            <div class="admin-countdown compact">
+              <div><b id="dcRepCount">—</b><small>+REP</small></div>
+            </div>
+            <p id="dcStatusLine">Nesukonfigūruota.</p>
+            <p><button type="button" id="discordTestBtn">Tikrinti dabar</button></p>
+            <p><button type="button" id="discordForgetBtn" class="secondary">Ištrinti tokeną</button></p>
+          </article>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -209,7 +236,7 @@
   </div>
 
   <div class="admin-toast" id="adminToast"></div>
-  <script src="store.js?v=12"></script>
-  <script src="admin.js?v=11"></script>
+  <script src="store.js?v=13"></script>
+  <script src="admin.js?v=12"></script>
 </body>
 </html>
