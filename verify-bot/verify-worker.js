@@ -180,7 +180,7 @@ export default {
           code,
           redirect_uri: `${cfg.base}/callback`,
         });
-        const tr = await fetch('https://discord.com/oauth2/token', {
+        const tr = await fetch('https://discord.com/api/oauth2/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: form.toString(),

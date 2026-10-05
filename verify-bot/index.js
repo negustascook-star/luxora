@@ -149,7 +149,7 @@ async function getValidUserToken(userId) {
       grant_type: 'refresh_token',
       refresh_token: rec.refresh_token,
     });
-    const r = await fetch('https://discord.com/oauth2/token', {
+    const r = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form.toString(),
@@ -176,7 +176,7 @@ app.get('/callback', async (req, res) => {
       code,
       redirect_uri: REDIRECT_URI,
     });
-    const tr = await fetch('https://discord.com/oauth2/token', {
+    const tr = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form.toString(),
