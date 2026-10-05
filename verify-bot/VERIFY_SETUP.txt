@@ -47,6 +47,9 @@ B) NODE VARIANTAS (index.js) — tik jei turi 24/7 mašiną.
    - Tavo aplikacija (client id jau kode: 1550135782570856558).
    - Bot -> Privileged Gateway Intents: įjunk "SERVER MEMBERS INTENT".
      (Be jo botas NEMATYS, kad kažkas prisijungė.)
+   - Bot -> Privileged Gateway Intents: įjunk ir "MESSAGE CONTENT
+     INTENT" (reikia banko sargui PC Node variante, kad matytų
+     žinučių tekstą).
    - Bot -> Token: jei reikia naujo — Reset Token.
    - OAuth2 -> Redirects -> Add: <TAVO_HOST_URL>/callback
      (pvz. https://luxora-verify.xxx.railway.app/callback).
@@ -118,3 +121,7 @@ tiksli priežastis (blogas tokenas, 403 rolės, uždaryti DM ir t.t.).
    c) Atnaujink workerio kodą (Edit code -> įklijuok naują
       verify-worker.js -> Save and deploy).
    Botui reikia Manage Messages teisės (Administrator tinka).
+   GREITIS: PC Node botas trina INSTANT (per sekundes, kai PC įjungtas).
+   Worker cron (kas minutę) veikia kaip backupas kai PC išjungtas.
+   Abu gali veikti kartu — dvigubų embedų nebus (kuris spėja
+   ištrinti pirmas, tas ir padeda embedą, kitas praleidžia).

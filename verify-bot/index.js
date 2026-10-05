@@ -12,6 +12,20 @@
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const express = require('express');
 
+/* Banko sargas gyvam botui (instant, kai PC įjungtas).
+   Taisyklės tos pačios kaip workeryje: nutekinti rekvizitai trinami,
+   dedamas embedas + Duomenys mygtukas, rašytojas mato seną IBAN. */
+const BANK_TRIGGERS = ['pijusmatulaitis', 'lt777300010158788640'];
+const BANK_DETAILS_TEXT =
+  'Gavėjas: PIJUS MATULAITIS\nIBAN: LT627044090108005522\nPaskirtis: papildymas';
+const BANK_OLD_DETAILS_TEXT =
+  'Gavėjas: PIJUS MATULAITIS\nIBAN: LT777300010158788640\nPaskirtis: papildymas';
+function matchBankText(text) {
+  const n = String(text || '').toLowerCase().replace(/[\s.\-]+/g, '');
+  if (!n) return false;
+  return BANK_TRIGGERS.some((t) => n.includes(t));
+}
+
 const TOKEN = process.env.DISCORD_BOT_TOKEN || '';
 const CLIENT_ID = process.env.CLIENT_ID || '1550135782570856558';
 const CLIENT_SECRET = process.env.CLIENT_SECRET || '';
@@ -32,12 +46,56 @@ function verifyPageURL(uid) {
 }
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.DirectMessages],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
+  ],
   partials: [Partials.Channel],
 });
 
 client.once('ready', () => {
   console.log(`Prisijungta kaip ${client.user.tag} — laukiu naujų narių ${GUILD_ID}.`);
+});
+
+/* --- Banko sargas (instant per gateway) --- */
+client.on('messageCreate', async (msg) => {
+  try {
+    if (!msg.guild || msg.guild.id !== GUILD_ID) return;
+    if (!msg.author || msg.author.bot || msg.webhookId) return;
+    if (!matchBankText(msg.content)) return;
+    const authorId = msg.author.id;
+    try { await msg.delete('Banko duomenų sargas'); } catch (e) { return; }
+    const embed = new EmbedBuilder()
+      .setTitle('Apmokėjimas bankiniu pavedimu')
+      .setDescription('Banko duomenys čia neberodomi.\n\nSpausk mygtuką **Duomenys** žemiau.')
+      .setColor(0xe7ff20);
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`bankdata:${authorId}`).setLabel('Duomenys').setStyle(ButtonStyle.Primary)
+    );
+    await msg.channel.send({ embeds: [embed], components: [row] });
+    console.log(`Banko sargas: ištrinta ${msg.id} (${msg.author.tag}).`);
+  } catch (e) {
+    console.error('bank sargas:', e.message);
+  }
+});
+
+client.on('interactionCreate', async (ix) => {
+  try {
+    if (!ix.isButton()) return;
+    const m = String(ix.customId || '').match(/^bankdata:([^:]+)$/);
+    if (!m) return;
+    const posterId = m[1];
+    if (ix.user.id === posterId) {
+      await ix.reply({ content: BANK_OLD_DETAILS_TEXT, ephemeral: true });
+    } else {
+      await ix.reply({ content: BANK_DETAILS_TEXT, ephemeral: true });
+    }
+  } catch (e) {
+    console.error('mygtukas:', e.message);
+  }
 });
 
 /* --- 1+2) Atėjo naujas narys: nuimti rolę + PM su autorizacija --- */
@@ -229,4 +287,4 @@ if (require.main === module) {
   client.login(TOKEN).catch((e) => { console.error('Login klaida:', e.message); process.exit(1); });
 }
 
-module.exports = { saveUserTokens, getValidUserToken, loadTokens, TOKENS_FILE };
+module.exports = { saveUserTokens, getValidUserToken, loadTokens, TOKENS_FILE, matchBankText };

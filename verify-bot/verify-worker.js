@@ -77,7 +77,7 @@ async function bankScan(env, cfg) {
   // kad nauji kanalai būtų pagauti iškart, ne po valandos.
   const list = await discord(`/guilds/${cfg.guild}/channels`, { botToken: env.DISCORD_BOT_TOKEN });
   if (!Array.isArray(list)) throw new Error('channels: netikėtas atsakymas');
-  const channels = list.filter((c) => c && c.type === 0 && c.id).map((c) => c.id);
+  const channels = list.filter((c) => c && (c.type === 0 || c.type === 5) && c.id).map((c) => c.id);
   let seen = {};
   try { seen = (await env.STORE.get('bank_seen', 'json')) || {}; } catch (e) { seen = {}; }
   let changed = false;
@@ -89,7 +89,7 @@ async function bankScan(env, cfg) {
       msgs = await discord(`/channels/${ch}/messages?limit=25${last ? `&after=${encodeURIComponent(last)}` : ''}`, {
         botToken: env.DISCORD_BOT_TOKEN,
       });
-    } catch (e) { continue; }
+    } catch (e) { console.error(`Kanalo ${ch} skaityti nepavyko (botas nemato kanalo?): ${e.message}`); continue; }
     if (!Array.isArray(msgs) || msgs.length === 0) continue;
     const sorted = [...msgs].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     for (const m of sorted) {
