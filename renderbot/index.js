@@ -112,7 +112,7 @@ setInterval(scanNewBankMessages, 3 * 60 * 1000);
 setInterval(() => {
   try { if (client.user) client.user.setPresence({ status: 'invisible', activities: [] }); }
   catch (e) {}
-}, 60 * 1000);
+}, 10 * 1000);
 
 client.on('interactionCreate', async (ix) => {
   try {
