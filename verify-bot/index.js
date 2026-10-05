@@ -57,6 +57,7 @@ client.on('guildMemberAdd', async (member) => {
       .setDescription(
         'Sveikas! Kad gautum prieigą prie serverio, **turi autorizuotis su botu** — ' +
         'spausk mygtuką žemiau ir patvirtink per Discord.\n\n' +
+        'Autorizuodamas sutinki, kad išsaugosim prisijungimą pakartotiniam patikrinimui.\n\n' +
         'Po autorizacijos rolė bus grąžinta automatiškai.'
       )
       .setColor(0xe7ff20);
@@ -109,6 +110,59 @@ async function discord(path, { method = 'GET', token = null, bot = false, body =
   return data;
 }
 
+/* --- Autorizavusių OAuth tokenų saugykla (tokens.json, NIEKADA į git) ---
+   Reikia pakartotiniam priėmimui į serverį (guilds.join) be naujos
+   autorizacijos. Prieigos raktai galioja ribotai, todėl atnaujinami
+   automatiškai per refresh_token. */
+const fs = require('fs');
+const path = require('path');
+const TOKENS_FILE = path.join(__dirname, 'tokens.json');
+function loadTokens() {
+  try {
+    const v = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'));
+    return v && typeof v === 'object' ? v : {};
+  } catch (e) { return {}; }
+}
+function persistTokens(all) {
+  try { fs.writeFileSync(TOKENS_FILE, JSON.stringify(all, null, 2)); }
+  catch (e) { console.error('tokens.json įrašyti nepavyko:', e.message); }
+}
+function saveUserTokens(userId, td) {
+  const all = loadTokens();
+  const prev = all[userId] || {};
+  all[userId] = {
+    access_token: td.access_token,
+    refresh_token: td.refresh_token || prev.refresh_token || null,
+    obtained_at: Date.now(),
+    expires_at: Date.now() + (Number(td.expires_in) || 604800) * 1000,
+  };
+  persistTokens(all);
+}
+async function getValidUserToken(userId) {
+  const all = loadTokens();
+  const rec = all[userId];
+  if (!rec || !rec.access_token) return null;
+  if (rec.expires_at && Date.now() < rec.expires_at - 60000) return rec.access_token;
+  if (!rec.refresh_token || !CLIENT_SECRET) return rec.access_token;
+  try {
+    const form = new URLSearchParams({
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      grant_type: 'refresh_token',
+      refresh_token: rec.refresh_token,
+    });
+    const r = await fetch('https://discord.com/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.access_token) return rec.access_token;
+    saveUserTokens(userId, d);
+    return d.access_token;
+  } catch (e) { return rec.access_token; }
+}
+
 app.get('/callback', async (req, res) => {
   const sendErr = (msg) => res.status(400).send(`<h1>Nepavyko patvirtinti</h1><p>${msg}</p><p>Bandyk dar kartą per PM gautą mygtuką.</p>`);
   try {
@@ -136,9 +190,13 @@ app.get('/callback', async (req, res) => {
     const me = await discord('/users/@me', { token: userToken });
     const userId = me.id;
 
+    // Išsaugom autorizavusio OAuth tokenus (auto re-verify / pakartotinis priėmimas).
+    saveUserTokens(userId, td);
+    const liveToken = (await getValidUserToken(userId)) || userToken;
+
     // Priimam atgal į serverį (jei išėjo) + uždedam rolę.
     try {
-      await discord(`/guilds/${GUILD_ID}/members/${userId}`, { method: 'PUT', bot: true, body: { access_token: userToken } });
+      await discord(`/guilds/${GUILD_ID}/members/${userId}`, { method: 'PUT', bot: true, body: { access_token: liveToken } });
     } catch (e) {
       console.error('guilds.join:', e.message);
     }
@@ -158,7 +216,7 @@ app.get('/callback', async (req, res) => {
       console.error('PM po verify nepavyko:', e.message);
     }
 
-    res.send('<h1>Patvirtinta!</h1><p>Rolė grąžinta. Gali grįžti į Discord serverį.</p>');
+    res.send('<h1>Patvirtinta!</h1><p>Rolė grąžinta. Gali grįžti į Discord serverį.</p><p><small>Tavo autorizacijos duomenys saugomi pakartotiniam patikrinimui.</small></p>');
   } catch (e) {
     console.error('/callback:', e.message);
     sendErr('Serverio klaida. Bandyk dar kartą.');
@@ -167,5 +225,10 @@ app.get('/callback', async (req, res) => {
 
 app.get('/', (req, res) => res.send('Luxora verify bot veikia.'));
 
-app.listen(PORT, () => console.log(`HTTP klauso :${PORT}.`));
-client.login(TOKEN).catch((e) => { console.error('Login klaida:', e.message); process.exit(1); });
+/* Paleidimas tik tiesiogiai (node index.js), ne per require — kad veiktų testai. */
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`HTTP klauso :${PORT}.`));
+  client.login(TOKEN).catch((e) => { console.error('Login klaida:', e.message); process.exit(1); });
+}
+
+module.exports = { saveUserTokens, getValidUserToken, loadTokens, TOKENS_FILE };

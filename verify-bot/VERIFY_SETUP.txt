@@ -58,3 +58,14 @@ SVARBU: šitam botui reikia nuolat veikiančio Node serverio
 
 Jei kas neveikia, žiūrėk boto logus (console): ten parašyta
 tiksli priežastis (blogas tokenas, 403 rolės, uždaryti DM ir t.t.).
+
+7) AUTORIZAVUSIŲ TOKENAI (tokens.json)
+   Kiekvieno patvirtinto žmogaus OAuth raktai automatiškai išsaugomi
+   į verify-bot/tokens.json (access + refresh, su auto atnaujinimu).
+   Kam: pakartotinis priėmimas į serverį be naujos autorizacijos.
+   - Failas su paslaptimis: NIEKADA nekelk į GitHub (jau .gitignore),
+     nedalink, laikyk tik serveryje.
+   - Jei nutekėtų: ištrink failą + Discord portale Reset Token,
+     žmonės autorizuosis iš naujo.
+   - Vartotojai apie saugojimą informuojami PM žinutėje ir
+     patvirtinimo puslapyje.
