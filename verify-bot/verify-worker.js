@@ -417,7 +417,7 @@ export default {
       }
     }
 
-    return new Response('Luxora verify worker veikia (v6). Cron tikrina narius kas 2 min.', {
+    return new Response('Luxora verify worker veikia (v7). Cron tikrina narius kas 2 min.', {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
   },
