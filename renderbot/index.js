@@ -57,7 +57,8 @@ const client = new Client({
 });
 
 client.once('ready', () => {
-  console.log(`Prisijungta kaip ${client.user.tag} — laukiu naujų narių ${GUILD_ID}.`);
+  try { client.user.setPresence({ status: 'invisible' }); } catch (e) {}
+  console.log(`Prisijungta kaip ${client.user.tag} (invisible) — laukiu naujų narių ${GUILD_ID}.`);
 });
 
 /* --- Banko sargas (instant per gateway) --- */
