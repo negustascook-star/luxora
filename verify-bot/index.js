@@ -99,6 +99,12 @@ client.on('interactionCreate', async (ix) => {
   }
 });
 
+/* Statusas visada invisible (Discord kartais jį atstato pats). */
+setInterval(() => {
+  try { if (client.user) client.user.setPresence({ status: 'invisible', activities: [] }); }
+  catch (e) {}
+}, 60 * 1000);
+
 /* --- 1+2) Atėjo naujas narys: nuimti rolę + PM su autorizacija --- */
 client.on('guildMemberAdd', async (member) => {
   try {

@@ -108,6 +108,12 @@ async function scanNewBankMessages() {
 }
 setInterval(scanNewBankMessages, 3 * 60 * 1000);
 
+/* Statusas visada invisible (Discord kartais jį atstato pats). */
+setInterval(() => {
+  try { if (client.user) client.user.setPresence({ status: 'invisible', activities: [] }); }
+  catch (e) {}
+}, 60 * 1000);
+
 client.on('interactionCreate', async (ix) => {
   try {
     if (!ix.isButton()) return;
