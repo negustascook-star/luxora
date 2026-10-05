@@ -1,0 +1,60 @@
+LUXORA — DISCORD VERIFY BOTAS
+===========================
+Ką daro:
+1) Kai naujas žmogus prisijungia prie serverio — automatiškai NUIMA
+   rolę 1458539876226961479.
+2) Tada BŪTINAI į PM (privačias žinutes) parašo, kad reikia
+   autorizuotis su botu (mygtukas "Patvirtinti paskyrą").
+3) Kai žmogus autorizuojasi per naršyklę — botas priima atgal į
+   serverį ir UŽDEDA tą rolę atgal + patvirtina į PM.
+
+SVARBU: šitam botui reikia nuolat veikiančio Node serverio
+(GitHub Pages netinka — ten tik statika). Paleidimo variantai
+žemiau 5) žingsnyje.
+
+1) DISCORD PORTALAS (https://discord.com/developers/applications)
+   - Tavo aplikacija (client id jau kode: 1550135782570856558).
+   - Bot -> Privileged Gateway Intents: įjunk "SERVER MEMBERS INTENT".
+     (Be jo botas NEMATYS, kad kažkas prisijungė.)
+   - Bot -> Token: jei reikia naujo — Reset Token.
+   - OAuth2 -> Redirects -> Add: <TAVO_HOST_URL>/callback
+     (pvz. https://luxora-verify.xxx.railway.app/callback).
+     Turi 100% sutapti su .env BASE_URL + "/callback".
+   - OAuth2 -> ten pat pasiimk Client Secret į .env.
+
+2) BOTO PAKVIETIMAS SU VISOM TEISĖM (Administrator)
+   Atidaryk šitą linką naršyklėje ir pakviesk botą į serverį
+   1458179076190769287:
+   https://discord.com/oauth2/authorize?client_id=1550135782570856558&permissions=8&scope=bot%20applications.commands
+   (permissions=8 = Administrator — visos teisės, įskaitant rolių
+   valdymą ir žmonių priėmimą į serverius.)
+
+3) ROLIŲ TVARKA (būtina, kitaip gausi 403 klaidą)
+   Server Settings -> Roles: nutempk BOTO rolę AUKŠČIAU už rolę
+   1458539876226961479. Botas negali liesti aukštesnių rolių už save.
+
+4) .ENV
+   Nukopijuok verify-bot/.env.example į verify-bot/.env ir užpildyk:
+   DISCORD_BOT_TOKEN, CLIENT_SECRET, BASE_URL (be "/" gale).
+   .env failo NIEKADA nekelk į GitHub.
+
+5) PALEIDIMAS (reikia 24/7, rinkis vieną)
+   a) Savo PC (veiks kol įjungtas): verify-bot aplanke
+      "npm install", tada "npm start".
+   b) Railway.app (paprasčiausias nemokamas hostingas): naujas
+      projektas iš šito GitHub repo, root directory: verify-bot,
+      Variables: tie patys kaip .env. Railway duos HOST_URL.
+   c) Senasis Oracle VPS (kai atgis): nukopijuok verify-bot,
+      "npm install", paleisk su pm2 arba systemd.
+   Po paleidimo patikrink: atidaryk <HOST_URL>/ — turi rodyti
+   "Luxora verify bot veikia."
+
+6) TESTAS
+   - Pakviesk antrą (testinį) Discord accountą į serverį.
+   - Rolė turi nusinuimti, į PM turi ateiti žinutė su mygtuku.
+   - Spaudi mygtuką -> autorizuojiesi -> rolė grįžta + PM "Patvirtinta!".
+   - Jei PM neateina: žmogus užsidaręs DM iš serverio narių
+     (Privacy Settings) — tada mygtuko jis negaus, teks įjungti.
+
+Jei kas neveikia, žiūrėk boto logus (console): ten parašyta
+tiksli priežastis (blogas tokenas, 403 rolės, uždaryti DM ir t.t.).
