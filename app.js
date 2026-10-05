@@ -293,6 +293,7 @@ function showToast(message){
 
 /* ---------- reputacija ---------- */
 let repReviews = [], repIndex = 0, repTimer = null;
+let repRenderedKey = '';
 function renderRepSlide(){
   const slide = document.querySelector('#repSlide');
   if(!slide) return;
@@ -300,6 +301,10 @@ function renderRepSlide(){
   document.querySelector('#repCarousel').hidden = false;
   repIndex = (repIndex + repReviews.length) % repReviews.length;
   const v = repReviews[repIndex];
+  // Jei tas pats atsiliepimas jau rodomas – HTML neliečiam, kad GIF avataras nesiresetintų.
+  const key = repIndex + '|' + (v.name || '') + '|' + (v.text || '') + '|' + (v.avatar || '');
+  if(key === repRenderedKey) return;
+  repRenderedKey = key;
   slide.innerHTML = `
     <img class="rep-avatar" src="${S.escapeHTML(v.avatar || '')}" alt="" loading="lazy" onerror="this.style.display='none'">
     <div class="rep-slide-body"><b>${S.escapeHTML(v.name || '?')}</b><p>${S.escapeHTML(v.text || '')}</p></div>`;
