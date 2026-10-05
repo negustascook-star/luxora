@@ -175,7 +175,11 @@ export default {
           body: form.toString(),
         });
         const td = await tr.json().catch(() => ({}));
-        if (!tr.ok || !td.access_token) return fail('Discord atmetė autorizaciją.');
+        if (!tr.ok || !td.access_token) {
+          const why = td.error_description || td.error || `HTTP ${tr.status}`;
+          console.error('token exchange:', tr.status, why);
+          return fail(`Discord atmetė autorizaciją (${why}).`);
+        }
 
         const meR = await fetch('https://discord.com/api/v10/users/@me', {
           headers: { Authorization: `Bearer ${td.access_token}` },
