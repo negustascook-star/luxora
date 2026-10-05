@@ -33,13 +33,24 @@ export function verifyURL(base, uid) {
   return `${clean}/verify${uid ? `?uid=${encodeURIComponent(uid)}` : ''}`;
 }
 
-export function diffMembers(currentIds, snapshotIds) {
-  const prev = new Set(Array.isArray(snapshotIds) ? snapshotIds : []);
-  const cur = new Set(Array.isArray(currentIds) ? currentIds : []);
-  return {
-    joined: [...cur].filter((id) => !prev.has(id)),
-    left: [...prev].filter((id) => !cur.has(id)),
+export function diffMembers(current, snapshot) {
+  // Palaiko ir naują formatą {id: joined_at}, ir seną [id, ...].
+  // Pakartotinis atėjimas pagaunamas pagal pasikeitusį joined_at —
+  // net jei išėjo ir grįžo tarp dviejų patikrinimų.
+  const norm = (v) => {
+    if (Array.isArray(v)) return new Map(v.map((id) => [id, null]));
+    if (v && typeof v === 'object') return new Map(Object.entries(v));
+    return new Map();
   };
+  const cur = norm(current);
+  const prev = norm(snapshot);
+  const joined = [];
+  for (const [id, ts] of cur) {
+    if (!prev.has(id)) joined.push(id);
+    else if (ts && prev.get(id) && ts !== prev.get(id)) joined.push(id);
+  }
+  const left = [...prev.keys()].filter((id) => !cur.has(id));
+  return { joined, left };
 }
 
 async function discord(path, { method = 'GET', botToken = null, userToken = null, body = null } = {}) {
@@ -239,15 +250,26 @@ export default {
     const cfg = cfgOf(env);
     try {
       const members = await listAllMembers(env.DISCORD_BOT_TOKEN, cfg.guild);
-      const current = members.map((m) => m.user && m.user.id).filter(Boolean);
+      const current = {};
+      for (const m of members) {
+        if (m.user && m.user.id) current[m.user.id] = m.joined_at || null;
+      }
       const raw = await env.STORE.get('members');
       if (!raw) {
         // Pirmas paleidimas: tik išsaugom sąrašą, veiksmų nedarom.
         await env.STORE.put('members', JSON.stringify(current));
-        console.log(`Baseline išsaugotas (${current.length} narių). Nuo kito karto stebima.`);
+        console.log(`Baseline išsaugotas (${Object.keys(current).length} narių). Nuo kito karto stebima.`);
         return;
       }
-      const { joined } = diffMembers(current, JSON.parse(raw));
+      let snapshot = null;
+      try { snapshot = JSON.parse(raw); } catch (e) { snapshot = null; }
+      if (!snapshot) {
+        // Sugadinti duomenys — perrašom švariai, veiksmų nedarom.
+        await env.STORE.put('members', JSON.stringify(current));
+        console.log('Snapshot atstatytas iš naujo.');
+        return;
+      }
+      const { joined } = diffMembers(current, snapshot);
       if (!joined.length) return;
       const byId = new Map(members.map((m) => [m.user.id, (m.user.username || '?')]));
       for (const id of joined) {
