@@ -52,7 +52,7 @@ export function bankEmbed(authorId) {
   return {
     embeds: [{
       title: 'Apmokėjimas bankiniu pavedimu',
-      description: 'Banko duomenys čia neberodomi.\n\nSpausk mygtuką **Duomenys** žemiau — rekvizitus gausi privačiai, matysi tik tu.',
+      description: 'Banko duomenys čia neberodomi.\n\nSpausk mygtuką **Duomenys** žemiau.',
       color: 0xe7ff20,
     }],
     components: [{
