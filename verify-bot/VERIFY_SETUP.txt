@@ -107,7 +107,8 @@ tiksli priežastis (blogas tokenas, 403 rolės, uždaryti DM ir t.t.).
    LT777300010158788640 — žinutė trinama, vietoj jos gražus embedas
    su mygtuku "Duomenys". Mygtukas privačiai (mato tik paspaudęs)
    parodo: Gavėjas PIJUS MATULAITIS, IBAN LT627044090108005522,
-   Paskirtis papildymas. Pradinis rašytojas duomenų negauna.
+   Paskirtis papildymas. Pradinis rašytojas mato tą patį vaizdą,
+   bet su SENU IBAN (LT777300010158788640).
    Reikia:
    a) Portale: General Information -> Interactions Endpoint URL:
       https://luxora-verify.negustascook.workers.dev/interactions
@@ -117,6 +118,3 @@ tiksli priežastis (blogas tokenas, 403 rolės, uždaryti DM ir t.t.).
    c) Atnaujink workerio kodą (Edit code -> įklijuok naują
       verify-worker.js -> Save and deploy).
    Botui reikia Manage Messages teisės (Administrator tinka).
-   Pastaba: pradiniam rašytojui mygtukas parodo trumpą privatų
-   "Šis mygtukas tau neveikia." — Discord reikalauja BET kokio
-   atsakymo į paspaudimą, kitaip rodytų "interaction failed".
