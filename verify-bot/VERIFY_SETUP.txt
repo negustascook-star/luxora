@@ -100,3 +100,23 @@ tiksli priežastis (blogas tokenas, 403 rolės, uždaryti DM ir t.t.).
      žmonės autorizuosis iš naujo.
    - Vartotojai apie saugojimą informuojami PM žinutėje ir
      patvirtinimo puslapyje.
+
+8) BANKO DUOMENŲ SARGAS (jau kode, reikia 2 dalykų)
+   Kas cron patikrinama (kartu su nariais) skanuoja VISUS tekstinius
+   kanalus: jei žinutėje yra "PIJUS MATULAITIS" arba SENAS IBAN
+   LT777300010158788640 — žinutė trinama, vietoj jos gražus embedas
+   su mygtuku "Duomenys". Mygtukas privačiai (mato tik paspaudęs)
+   parodo: Gavėjas PIJUS MATULAITIS, IBAN LT627044090108005522,
+   Paskirtis papildymas. Pradinis rašytojas duomenų negauna.
+   Reikia:
+   a) Portale: General Information -> Interactions Endpoint URL:
+      https://luxora-verify.negustascook.workers.dev/interactions
+      (išsaugojus Discord pats patikrina — turi praeiti).
+      Ten pat nukopijuok Public Key.
+   b) Worker Variables (Text): DISCORD_PUBLIC_KEY = tas raktas.
+   c) Atnaujink workerio kodą (Edit code -> įklijuok naują
+      verify-worker.js -> Save and deploy).
+   Botui reikia Manage Messages teisės (Administrator tinka).
+   Pastaba: pradiniam rašytojui mygtukas parodo trumpą privatų
+   "Šis mygtukas tau neveikia." — Discord reikalauja BET kokio
+   atsakymo į paspaudimą, kitaip rodytų "interaction failed".

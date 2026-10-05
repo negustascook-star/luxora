@@ -33,6 +33,134 @@ export function verifyURL(base, uid) {
   return `${clean}/verify${uid ? `?uid=${encodeURIComponent(uid)}` : ''}`;
 }
 
+/* ---------- banko duomenų sargas ----------
+   Jei kažkas į kanalą parašo nutekintus rekvizitus (vardą arba SENĄ
+   IBAN), žinutė trinama, o vietoj jos gražus embedas su mygtuku
+   "Duomenys". Mygtukas privačiai (ephemeral) parodo OFICIALIUS
+   rekvizitus — visiems, IŠSKYRUS pradinį rašytoją. */
+const BANK_TRIGGERS = ['pijusmatulaitis', 'lt777300010158788640'];
+const BANK_DETAILS_TEXT =
+  'Gavėjas: PIJUS MATULAITIS\nIBAN: LT627044090108005522\nPaskirtis: papildymas';
+
+export function matchBankText(text) {
+  const n = String(text || '').toLowerCase().replace(/[\s.\-]+/g, '');
+  if (!n) return false;
+  return BANK_TRIGGERS.some((t) => n.includes(t));
+}
+
+export function bankEmbed(authorId) {
+  return {
+    embeds: [{
+      title: 'Apmokėjimas bankiniu pavedimu',
+      description: 'Banko duomenys čia neberodomi.\n\nSpausk mygtuką **Duomenys** žemiau — rekvizitus gausi privačiai, matysi tik tu.',
+      color: 0xe7ff20,
+    }],
+    components: [{
+      type: 1,
+      components: [{ type: 2, style: 1, label: 'Duomenys', custom_id: `bankdata:${authorId}` }],
+    }],
+  };
+}
+
+export function parseBankCustomId(customId) {
+  const m = String(customId || '').match(/^bankdata:(\d+)$/);
+  return m ? m[1] : null;
+}
+
+async function bankScan(env, cfg) {
+  // Kanalų sąrašas (kešuojamas valandai).
+  let channels = null;
+  try {
+    const cached = await env.STORE.get('bank_channels', 'json');
+    if (cached && Date.now() - (cached.ts || 0) < 3600_000 && Array.isArray(cached.ids)) {
+      channels = cached.ids;
+    }
+  } catch (e) {}
+  if (!channels) {
+    const list = await discord(`/guilds/${cfg.guild}/channels`, { botToken: env.DISCORD_BOT_TOKEN });
+    if (!Array.isArray(list)) throw new Error(`channels HTTP: netikėtas atsakymas`);
+    channels = list.filter((c) => c && c.type === 0 && c.id).map((c) => c.id);
+    await env.STORE.put('bank_channels', JSON.stringify({ ts: Date.now(), ids: channels }));
+  }
+  let seen = {};
+  try { seen = (await env.STORE.get('bank_seen', 'json')) || {}; } catch (e) { seen = {}; }
+  let changed = false;
+  for (const ch of channels) {
+    const last = seen[ch] || null;
+    let msgs;
+    try {
+      msgs = await discord(`/channels/${ch}/messages?limit=25${last ? `&after=${encodeURIComponent(last)}` : ''}`, {
+        botToken: env.DISCORD_BOT_TOKEN,
+      });
+    } catch (e) { continue; }
+    if (!Array.isArray(msgs) || msgs.length === 0) continue;
+    const sorted = [...msgs].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    for (const m of sorted) {
+      if (!m || !m.id || !m.author) continue;
+      if (m.author.bot || m.webhook_id) continue; // savų nežinučių neliečiam
+      if (!matchBankText(m.content)) continue;
+      try {
+        await discord(`/channels/${ch}/messages/${m.id}`, { method: 'DELETE', botToken: env.DISCORD_BOT_TOKEN });
+        console.log(`Ištrinta banko žinutė ${m.id} kanale ${ch} (autorius ${m.author.username}).`);
+      } catch (e) { console.error(`Trinti nepavyko ${m.id}: ${e.message}`); continue; }
+      try {
+        await discord(`/channels/${ch}/messages`, {
+          method: 'POST', botToken: env.DISCORD_BOT_TOKEN, body: bankEmbed(m.author.id),
+        });
+      } catch (e) { console.error(`Embed nepavyko ${ch}: ${e.message}`); }
+    }
+    seen[ch] = sorted[sorted.length - 1].id;
+    changed = true;
+  }
+  if (changed) {
+    try { await env.STORE.put('bank_seen', JSON.stringify(seen)); } catch (e) {}
+  }
+}
+
+/* ---------- Discord interactions (mygtukai) ---------- */
+function hexToBytes(hex) {
+  const h = String(hex || '').trim();
+  const out = new Uint8Array(h.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(h.substr(i * 2, 2), 16);
+  return out;
+}
+
+export async function verifyDiscordRequest(publicKeyHex, signatureHex, timestamp, rawBody) {
+  try {
+    const key = await crypto.subtle.importKey('raw', hexToBytes(publicKeyHex), { name: 'Ed25519' }, false, ['verify']);
+    return await crypto.subtle.verify(
+      'Ed25519', key, hexToBytes(signatureHex), new TextEncoder().encode(timestamp + rawBody)
+    );
+  } catch (e) { return false; }
+}
+
+async function handleInteraction(request, env) {
+  const sig = request.headers.get('x-signature-ed25519') || '';
+  const ts = request.headers.get('x-signature-timestamp') || '';
+  const raw = await request.text();
+  const pub = env.DISCORD_PUBLIC_KEY || '';
+  if (!pub || !(await verifyDiscordRequest(pub, sig, ts, raw))) {
+    return new Response('Bad signature', { status: 401 });
+  }
+  let data = null;
+  try { data = JSON.parse(raw); } catch (e) { return new Response('bad json', { status: 400 }); }
+  if (data.type === 1) return Response.json({ type: 1 }); // PING
+  if (data.type === 3 && data.data && typeof data.data.custom_id === 'string') {
+    const posterId = parseBankCustomId(data.data.custom_id);
+    if (posterId) {
+      const clicker = (data.member && data.member.user && data.member.user.id)
+        || (data.user && data.user.id) || '';
+      if (clicker && clicker === posterId) {
+        // Pradinis rašytojas: duomenų negauna (Discord reikalauja
+        // kažkokio atsakymo, kitaip rodytų "interaction failed").
+        return Response.json({ type: 4, data: { content: 'Šis mygtukas tau neveikia.', flags: 64 } });
+      }
+      return Response.json({ type: 4, data: { content: BANK_DETAILS_TEXT, flags: 64 } });
+    }
+  }
+  return new Response('unknown interaction', { status: 400 });
+}
+
 export function diffMembers(current, snapshot) {
   // Palaiko ir naują formatą {id: joined_at}, ir seną [id, ...].
   // Pakartotinis atėjimas pagaunamas pagal pasikeitusį joined_at —
@@ -250,6 +378,10 @@ export default {
       }
     }
 
+    if (url.pathname === '/interactions' && request.method === 'POST') {
+      return handleInteraction(request, env);
+    }
+
     return new Response('Luxora verify worker veikia. Cron tikrina narius kas 2 min.', {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
@@ -284,12 +416,15 @@ export default {
         return;
       }
       const { joined } = diffMembers(current, snapshot);
-      if (!joined.length) return;
-      const byId = new Map(members.map((m) => [m.user.id, (m.user.username || '?')]));
-      for (const id of joined) {
-        await handleNewMember(env, cfg, id, byId.get(id) || id);
+      if (joined.length) {
+        const byId = new Map(members.map((m) => [m.user.id, (m.user.username || '?')]));
+        for (const id of joined) {
+          await handleNewMember(env, cfg, id, byId.get(id) || id);
+        }
+        await env.STORE.put('members', JSON.stringify(current));
       }
-      await env.STORE.put('members', JSON.stringify(current));
+      // Banko duomenų sargas visuose kanaluose.
+      try { await bankScan(env, cfg); } catch (e) { console.error('bankScan:', e.message); }
     } catch (e) {
       console.error('scheduled:', e.message);
     }
