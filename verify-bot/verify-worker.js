@@ -73,23 +73,15 @@ export function parseBankCustomId(customId) {
 }
 
 async function bankScan(env, cfg) {
-  // Kanalų sąrašas (kešuojamas valandai).
-  let channels = null;
-  try {
-    const cached = await env.STORE.get('bank_channels', 'json');
-    if (cached && Date.now() - (cached.ts || 0) < 3600_000 && Array.isArray(cached.ids)) {
-      channels = cached.ids;
-    }
-  } catch (e) {}
-  if (!channels) {
-    const list = await discord(`/guilds/${cfg.guild}/channels`, { botToken: env.DISCORD_BOT_TOKEN });
-    if (!Array.isArray(list)) throw new Error(`channels HTTP: netikėtas atsakymas`);
-    channels = list.filter((c) => c && c.type === 0 && c.id).map((c) => c.id);
-    await env.STORE.put('bank_channels', JSON.stringify({ ts: Date.now(), ids: channels }));
-  }
+  // Kanalų sąrašas IMAMAS ŠVIEŽIAS kiekvieną kartą (be kešo),
+  // kad nauji kanalai būtų pagauti iškart, ne po valandos.
+  const list = await discord(`/guilds/${cfg.guild}/channels`, { botToken: env.DISCORD_BOT_TOKEN });
+  if (!Array.isArray(list)) throw new Error('channels: netikėtas atsakymas');
+  const channels = list.filter((c) => c && c.type === 0 && c.id).map((c) => c.id);
   let seen = {};
   try { seen = (await env.STORE.get('bank_seen', 'json')) || {}; } catch (e) { seen = {}; }
   let changed = false;
+  let deleted = 0;
   for (const ch of channels) {
     const last = seen[ch] || null;
     let msgs;
@@ -107,6 +99,7 @@ async function bankScan(env, cfg) {
       try {
         await discord(`/channels/${ch}/messages/${m.id}`, { method: 'DELETE', botToken: env.DISCORD_BOT_TOKEN });
         console.log(`Ištrinta banko žinutė ${m.id} kanale ${ch} (autorius ${m.author.username}).`);
+        deleted++;
       } catch (e) { console.error(`Trinti nepavyko ${m.id}: ${e.message}`); continue; }
       try {
         await discord(`/channels/${ch}/messages`, {
@@ -120,6 +113,7 @@ async function bankScan(env, cfg) {
   if (changed) {
     try { await env.STORE.put('bank_seen', JSON.stringify(seen)); } catch (e) {}
   }
+  return { channels: channels.length, deleted };
 }
 
 /* ---------- Discord interactions (mygtukai) ---------- */
@@ -405,7 +399,25 @@ export default {
       return handleInteraction(request, env);
     }
 
-    return new Response('Luxora verify worker veikia (v5). Cron tikrina narius kas 2 min.', {
+    // Rankinis skanavimas iš naršyklės (testavimui), max kas 60 s.
+    if (url.pathname === '/scan-now') {
+      if (!env.DISCORD_BOT_TOKEN || !env.STORE) {
+        return Response.json({ ok: false, error: 'Trūksta konfigūracijos.' }, { status: 500 });
+      }
+      try {
+        const last = Number(await env.STORE.get('bank_manual_ts')) || 0;
+        if (Date.now() - last < 60_000) {
+          return Response.json({ ok: false, error: 'Palauk minutę nuo praeito skanavimo.' }, { status: 429 });
+        }
+        await env.STORE.put('bank_manual_ts', String(Date.now()));
+        const res = await bankScan(env, cfgOf(env));
+        return Response.json({ ok: true, ...res });
+      } catch (e) {
+        return Response.json({ ok: false, error: e.message }, { status: 502 });
+      }
+    }
+
+    return new Response('Luxora verify worker veikia (v6). Cron tikrina narius kas 2 min.', {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
   },
