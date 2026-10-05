@@ -56,9 +56,7 @@ client.on('guildMemberAdd', async (member) => {
       .setTitle('Reikia patvirtinti paskyrą')
       .setDescription(
         'Sveikas! Kad gautum prieigą prie serverio, **turi autorizuotis su botu** — ' +
-        'spausk mygtuką žemiau ir patvirtink per Discord.\n\n' +
-        'Autorizuodamas sutinki, kad išsaugosim prisijungimą pakartotiniam patikrinimui.\n\n' +
-        'Po autorizacijos rolė bus grąžinta automatiškai.'
+        'spausk mygtuką žemiau ir patvirtink per Discord.'
       )
       .setColor(0xe7ff20);
 
