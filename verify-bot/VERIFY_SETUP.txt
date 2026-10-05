@@ -8,9 +8,40 @@ Ką daro:
 3) Kai žmogus autorizuojasi per naršyklę — botas priima atgal į
    serverį ir UŽDEDA tą rolę atgal + patvirtina į PM.
 
-SVARBU: šitam botui reikia nuolat veikiančio Node serverio
-(GitHub Pages netinka — ten tik statika). Paleidimo variantai
-žemiau 5) žingsnyje.
+SVARBU: du paleidimo variantai — A (rekomenduoju) veikia nemokamai
+ant Cloudflare (jau turi paskyrą), be jokio PC/serverio. Failas
+verify-worker.js. B (index.js + Node) — jei kada turėsi VPS/PC 24/7.
+
+A) WORKER VARIANTAS (nemokama, 24/7, ~10 min darbo)
+   Workeris kas 2 min pats patikrina narių sąrašą per Discord REST
+   (gateway nereikia, jokių privileged intents nereikia).
+   a) Cloudflare -> Workers & Pages -> Create application ->
+      Start with Hello World -> vardas pvz. luxora-verify -> Deploy.
+   b) Edit code -> ištrink viską -> įklijuok verify-worker.js
+      iš šito repo -> Save and deploy. Nukopijuok URL, pvz:
+      https://luxora-verify.negustascook.workers.dev
+   c) To workerio Settings -> Variables:
+      Secrets: DISCORD_BOT_TOKEN (= boto tokenas),
+               CLIENT_SECRET (= iš portalo OAuth2).
+      Text: GUILD_ID=1458179076190769287,
+            VERIFY_ROLE_ID=1458539876226961479,
+            CLIENT_ID=1550135782570856558,
+            BASE_URL=https://luxora-verify.negustascook.workers.dev
+      (savo URL, be "/" gale).
+   d) Workers -> KV (kairėje) -> Create namespace, pvz. luxora-verify.
+      Tada workerio Settings -> Bindings -> Add binding ->
+      KV Namespace, kintamasis: STORE, namespace: ką tik sukurtas.
+   e) Workerio Triggers -> Cron -> Add Cron Trigger: kas 2 minutes.
+   f) Discord portalas OAuth2 -> Redirects -> pridėk:
+      https://luxora-verify.negustascook.workers.dev/callback
+   g) Pakviesk botą su admin linku (2 žingsnis žemiau) + boto rolė
+      AUKŠČIAU už verify rolę (3 žingsnis).
+   h) Palauk 2 min (pirmas cron tik išsaugo sąrašą, nieko nedaro),
+      tada testuok su antru accountu (6 žingsnis).
+      Tokenai saugomi KV (raktažodis "tokens") — iš KV niekur
+      nekelk ir nedalink.
+
+B) NODE VARIANTAS (index.js) — tik jei turi 24/7 mašiną.
 
 1) DISCORD PORTALAS (https://discord.com/developers/applications)
    - Tavo aplikacija (client id jau kode: 1550135782570856558).
