@@ -32,8 +32,11 @@ function corsHeaders() {
 
 function avatarURL(author) {
   if (author && author.avatar) {
-    const ext = String(author.avatar).startsWith('a_') ? 'gif' : 'png';
-    return `https://cdn.discordapp.com/avatars/${author.id}/${author.avatar}.${ext}?size=64`;
+    // Animiuotiems avatarams TIK webp+animated (Discord CDN .gif+?size meta 415).
+    if (String(author.avatar).startsWith('a_')) {
+      return `https://cdn.discordapp.com/avatars/${author.id}/${author.avatar}.webp?animated=true&size=128`;
+    }
+    return `https://cdn.discordapp.com/avatars/${author.id}/${author.avatar}.png?size=128`;
   }
   return '';
 }

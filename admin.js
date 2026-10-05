@@ -399,6 +399,7 @@ function renderDiscordStatus(){
   if(!st.tokenSet) parts.push('Neįvestas bot tokenas.');
   if(st.lastError) parts.push('Klaida: ' + st.lastError);
   if(st.lastCheck) parts.push('Tikrinta: ' + new Intl.DateTimeFormat('lt-LT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(st.lastCheck)));
+  if(st.src === 'auto') parts.push('Šaltinis: auto (veikia visiems).');
   line.textContent = parts.length ? parts.join(' ') : 'Veikia — kanalas tikrinamas kas 30 s.';
 }
 document.querySelector('#discordSettingsForm').addEventListener('submit',e=>{

@@ -15,12 +15,13 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
 
   /* Atsiliepimai iš Discord: puslapis pats negali kviesti Discord API
      (naršyklė blokuoja CORS, o boto tokenas viešame kode būtų pavogtas).
-     Todėl užklausa eina per Worker-tarpininką (žr. REPUTATION_SETUP.txt).
-     Worker URL ima iš admin panelės nustatymų, čia – tik atsarginis.
-     Bot tokenas saugomas TIK admino naršyklės localStorage
-     (įvedama per admin panelę, niekada nepatenka į git). */
+     Todėl užklausa eina per Worker-tarpininką, kurio URL įrašytas žemiau,
+     o tokenas saugomas Worker Secrets (Cloudflare dashboard) — taip
+     atsiliepimus mato VISI lankytojai, ne tik admino naršyklė.
+     Admin panelės tokenas – tik atsarginis LIVE režimas. */
   const REPUTATION_API_URL =
-    (typeof window !== 'undefined' && window.LUXORA_REPUTATION_URL) || '';
+    (typeof window !== 'undefined' && window.LUXORA_REPUTATION_URL) ||
+    'https://luxora-rep.negustascook.workers.dev';
 
   const KEYS = {
     cart: 'luxora_cart_v1',
@@ -240,7 +241,8 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
       channel: cfg.channel,
       lastCheck: st.lastCheck || 0,
       lastCount: typeof st.lastCount === 'number' ? st.lastCount : null,
-      lastError: st.lastError || ''
+      lastError: st.lastError || '',
+      src: st.src || ''
     };
   }
   async function fetchReputation(url, extraHeaders){
@@ -259,27 +261,33 @@ if(e.key==='F12'||((e.ctrlKey||e.metaKey)&&e.shiftKey&&(k==='i'||k==='j'||k==='c
   let repCache = null;
   async function getReputation(){
     const cfg = getDiscordConfig();
-    try {
-      if(cfg.worker && cfg.token){
-        // Pagrindinis kelias: tokenas iš admin panelės, užklausa per Worker.
+    // 1) Bendras kelias visiems lankytojams: Worker su tokenu Secrets.
+    if(REPUTATION_API_URL){
+      try {
+        const data = await fetchReputation(REPUTATION_API_URL);
+        repCache = data;
+        writeDcStatus({ lastCheck: Date.now(), lastCount: data.positive, lastError: '', src: 'auto' });
+        try { document.dispatchEvent(new CustomEvent('luxora:rep')); } catch(e){}
+        return repCache;
+      } catch(e){
+        writeDcStatus({ lastCheck: Date.now(), lastError: e.message || 'Nežinoma klaida', src: 'auto' });
+      }
+    }
+    // 2) Atsarginis LIVE kelias: tokenas iš admin panelės.
+    if(cfg.worker && cfg.token){
+      try {
         const endpoint = `${cfg.worker.replace(/\/+$/, '')}/?channel=${encodeURIComponent(cfg.channel)}`;
         const data = await fetchReputation(endpoint, { Authorization: `Bot ${cfg.token}` });
         repCache = data;
-        writeDcStatus({ lastCheck: Date.now(), lastCount: data.positive, lastError: '' });
+        writeDcStatus({ lastCheck: Date.now(), lastCount: data.positive, lastError: '', src: 'worker' });
         try { document.dispatchEvent(new CustomEvent('luxora:rep')); } catch(e){}
         return repCache;
+      } catch(e){
+        writeDcStatus({ lastCheck: Date.now(), lastError: e.message || 'Nežinoma klaida', src: 'worker' });
       }
-      if(REPUTATION_API_URL){
-        // Atsarginis kelias: tokenas Worker Secrets (savo serveris).
-        const data = await fetchReputation(REPUTATION_API_URL);
-        repCache = data;
-        try { document.dispatchEvent(new CustomEvent('luxora:rep')); } catch(e){}
-        return repCache;
-      }
-    } catch(e){
-      writeDcStatus({ lastCheck: Date.now(), lastError: e.message || 'Nežinoma klaida' });
     }
-    return repCache;
+    if(repCache) return repCache;
+    return null;
   }
   function readCart(){ try { const v = JSON.parse(localStorage.getItem(KEYS.cart) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
   function writeCart(c){ try { localStorage.setItem(KEYS.cart, JSON.stringify(c)); } catch(e){} document.dispatchEvent(new CustomEvent('luxora:cart')); }
