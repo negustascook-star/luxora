@@ -142,6 +142,7 @@ export async function handleInteraction(request, env) {
   const raw = await request.text();
   const pub = env.DISCORD_PUBLIC_KEY || '';
   if (!pub || !(await verifyDiscordRequest(pub, sig, ts, raw))) {
+    console.error('interactions: blogas parašas (tikrink DISCORD_PUBLIC_KEY).');
     return new Response('Bad signature', { status: 401 });
   }
   let data = null;
@@ -158,8 +159,10 @@ export async function handleInteraction(request, env) {
     const invoker = (data.member && data.member.user && data.member.user.id)
       || (data.user && data.user.id) || '';
     if (invoker !== ALLOWED_TESTER) {
+      console.log(`banktest atmestas (ne testuotojas): ${invoker || 'nežinomas'}`);
       return Response.json({ type: 4, data: { content: 'Neturi teisių naudotis šia komanda.', flags: 64 } });
     }
+    console.log(`banktest nuo testuotojo ${invoker}${data.guild_id ? ' (guild!)' : ' (DM)'}`);
     return Response.json({ type: 4, data: { ...bankEmbed('0'), flags: 64 } });
   }
   if (data.type === 3 && data.data && typeof data.data.custom_id === 'string') {
@@ -167,6 +170,7 @@ export async function handleInteraction(request, env) {
     if (posterId) {
       const clicker = (data.member && data.member.user && data.member.user.id)
         || (data.user && data.user.id) || '';
+      console.log(`mygtukas ${data.data.custom_id}, spaudė ${clicker || 'nežinomas'}`);
       if (clicker && clicker === posterId) {
         // Pradinis rašytojas: duomenų negauna (Discord reikalauja
         // kažkokio atsakymo, kitaip rodytų "interaction failed").
@@ -399,7 +403,7 @@ export default {
       return handleInteraction(request, env);
     }
 
-    return new Response('Luxora verify worker veikia. Cron tikrina narius kas 2 min.', {
+    return new Response('Luxora verify worker veikia (v5). Cron tikrina narius kas 2 min.', {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
   },
