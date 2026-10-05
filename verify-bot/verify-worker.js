@@ -41,6 +41,8 @@ export function verifyURL(base, uid) {
 const BANK_TRIGGERS = ['pijusmatulaitis', 'lt777300010158788640'];
 const BANK_DETAILS_TEXT =
   'Gavėjas: PIJUS MATULAITIS\nIBAN: LT627044090108005522\nPaskirtis: papildymas';
+// Vienintelis vartotojas, kuris mato ir gali naudoti /banktest.
+const ALLOWED_TESTER = '1427735541285388443';
 
 export function matchBankText(text) {
   const n = String(text || '').toLowerCase().replace(/[\s.\-]+/g, '');
@@ -63,7 +65,7 @@ export function bankEmbed(authorId) {
 }
 
 export function parseBankCustomId(customId) {
-  const m = String(customId || '').match(/^bankdata:(\d+)$/);
+  const m = String(customId || '').match(/^bankdata:([^:]+)$/);
   return m ? m[1] : null;
 }
 
@@ -134,7 +136,7 @@ export async function verifyDiscordRequest(publicKeyHex, signatureHex, timestamp
   } catch (e) { return false; }
 }
 
-async function handleInteraction(request, env) {
+export async function handleInteraction(request, env) {
   const sig = request.headers.get('x-signature-ed25519') || '';
   const ts = request.headers.get('x-signature-timestamp') || '';
   const raw = await request.text();
@@ -145,6 +147,21 @@ async function handleInteraction(request, env) {
   let data = null;
   try { data = JSON.parse(raw); } catch (e) { return new Response('bad json', { status: 400 }); }
   if (data.type === 1) return Response.json({ type: 1 }); // PING
+  // Slash komanda /banktest — testavimui DM ir serveryje (atsakymas
+  // privatus, mygtukas su custom_id bankdata:0 veikia visiems spaudžiantiems).
+  // Matyti/naudoti gali TIK testuotojas (ID žemiau) — kitiems privatus "Neturi teisių".
+  if (data.type === 2 && data.data && data.data.name === 'banktest') {
+    // Komanda veikia TIK privačiose žinutėse (DM), ne serveriuose.
+    if (data.guild_id) {
+      return Response.json({ type: 4, data: { content: 'Ši komanda veikia tik privačiose žinutėse (DM).', flags: 64 } });
+    }
+    const invoker = (data.member && data.member.user && data.member.user.id)
+      || (data.user && data.user.id) || '';
+    if (invoker !== ALLOWED_TESTER) {
+      return Response.json({ type: 4, data: { content: 'Neturi teisių naudotis šia komanda.', flags: 64 } });
+    }
+    return Response.json({ type: 4, data: { ...bankEmbed('0'), flags: 64 } });
+  }
   if (data.type === 3 && data.data && typeof data.data.custom_id === 'string') {
     const posterId = parseBankCustomId(data.data.custom_id);
     if (posterId) {
