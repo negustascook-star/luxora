@@ -227,7 +227,21 @@ export default {
         } catch (e) { console.error('PM po verify nepavyko:', e.message); }
 
         return new Response(
-          '<h1>Patvirtinta!</h1><p>Rolė grąžinta. Gali grįžti į Discord serverį.</p><p><small>Tavo autorizacijos duomenys saugomi pakartotiniam patikrinimui.</small></p>',
+          `<!doctype html><html lang="lt"><head><meta charset="utf-8">` +
+          `<meta name="viewport" content="width=device-width,initial-scale=1">` +
+          `<title>Patvirtinta — Luxora</title><style>` +
+          `*{box-sizing:border-box;margin:0}body{min-height:100vh;display:flex;align-items:center;justify-content:center;` +
+          `background:#0b0d0a;color:#f2f3eb;font-family:Inter,system-ui,sans-serif;padding:20px}` +
+          `.card{background:#12160f;border:1px solid #2a3122;border-radius:20px;padding:40px 36px;text-align:center;max-width:420px}` +
+          `.check{width:72px;height:72px;margin:0 auto 18px;border-radius:50%;background:#e7ff20;color:#0b0d0a;` +
+          `font-size:36px;font-weight:900;display:flex;align-items:center;justify-content:center}` +
+          `h1{font-size:28px;margin-bottom:10px}p{color:#c9cec0;margin-bottom:22px}` +
+          `a{display:inline-block;background:#e7ff20;color:#0b0d0a;font-weight:800;text-decoration:none;` +
+          `padding:12px 26px;border-radius:12px}</style></head><body><div class="card">` +
+          `<div class="check">✓</div><h1>Patvirtinta!</h1>` +
+          `<p>Rolė grąžinta. Gali grįžti į Discord serverį.</p>` +
+          `<a href="https://discord.com/channels/${cfg.guild}">Grįžti į serverį</a>` +
+          `</div></body></html>`,
           { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
         );
       } catch (e) {
